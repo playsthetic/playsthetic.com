@@ -1,26 +1,122 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import Card from "../components/Card.astro";
+import "@fontsource-variable/inter";
+
+import HeadNav from "../components/HeadNav.astro";
+import ScrollNav from "../components/ScrollNav.astro";
+
+import Punch from "../components/sections/Punch.astro";
+import Montezuma from "../components/sections/Montezuma.astro";
+import Swordfish from "../components/sections/Swordfish.astro";
+import Splash from "../components/sections/Splash.astro";
+import About from "../components/sections/About.astro";
 ---
 
-<Layout title="Playsthetic">
-    <!-- <nav class="head-nav">
-            <h3>Playsthetic</h3>
-        </nav> -->
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <!-- <meta name="description" content="Astro description" /> -->
+        <!-- <meta name="viewport" content="width=device-width" /> -->
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="generator" content={Astro.generator} />
+        <script
+            src="https://kit.fontawesome.com/3fd0af1c48.js"
+            crossorigin="anonymous"></script>
+        <title>Playsthetic</title>
+    </head>
+    <body>
+        <!-- <HeadNav /> -->
+        <div class="holder">
+            <Splash />
+            <Montezuma />
+            <Punch />
+            <Swordfish />
+            <About />
+        </div>
+        <ScrollNav />
+    </body>
+</html>
 
-    <div class="container">
-        <section id="splash"></section>
-        <section id="montezuma"></section>
-        <section id="punch"></section>
-        <section id="swordfish"></section>
-        <section id="about"></section>
-    </div>
+<style is:global>
+    body {
+        font-family: "Inter Variable";
+        font-size: 14px;
+        color: #898989;
+        background: radial-gradient(circle at center, rgb(48, 48, 48), #171717);
+    }
 
-    <nav class="scroll-nav">
-        <a href="#splash">Go to section 1</a>
-        <a href="#montezuma">Go to section 1</a>
-        <a href="#punch">Go to section 2</a>
-        <a href="#swordfish">Go to section 3</a>
-        <a href="#about">Go to section 4</a>
-    </nav>
-</Layout>
+    .holder {
+        scroll-snap-type: y mandatory;
+        overflow-y: scroll;
+        height: 100vh;
+    }
+    .section {
+        position: relative;
+        height: 100vh;
+        /* justify-content: center;
+        align-items: center; */
+        scroll-snap-align: start;
+        /* box-sizing: border-box; */
+    }
+    .content {
+        padding: 200px;
+        height: 100vh;
+    }
+
+    .fab {
+        font-size: 60px;
+        padding: 20px;
+    }
+
+    .fa-solid {
+        color: rgb(147, 95, 232);
+        font-size: 50px;
+        padding-bottom: 15px;
+        padding-left: 5px;
+    }
+
+    .deck {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+
+    .card {
+        flex: 1;
+        margin: 10px;
+        background: rgb(53, 53, 53);
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    h1 {
+        font-size: 50px;
+        font-weight: bold;
+    }
+
+    h2 {
+        font-size: 60px;
+        color: rgb(234, 234, 234);
+        padding-bottom: 20px;
+        font-weight: bold;
+    }
+
+    h3 {
+        font-size: 20px;
+        color: rgb(214, 214, 214);
+        padding-bottom: 20px;
+        font-weight: bold;
+    }
+
+    h4 {
+        margin-bottom: 10px;
+        font-size: 16px;
+        color: rgb(248, 248, 248);
+    }
+
+    a {
+        color: inherit; /* Inherit the color from the parent element */
+        text-decoration: none; /* Remove the underline */
+    }
+</style>
