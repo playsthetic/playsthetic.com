@@ -1,5 +1,6 @@
 <div id="splash" class="section">
     <div class="content">
+        <img id="background-image" src="splash.png" />
         <h1>Playsthetic</h1>
         <h2>We make it, you play it</h2>
         <h3>Our design philosophy</h3>
@@ -45,5 +46,23 @@
         background: -webkit-linear-gradient(45deg, #5eff55, #ffffff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+    }
+
+    .content {
+        /* background: radial-gradient(
+            circle 500px at 1325px 450px,
+            #4f286c,
+            #ffffff00
+        );
+        z-index: -2; */
+    }
+    #background-image {
+        position: absolute;
+        z-index: -1;
+        width: 700px;
+        opacity: 50%;
+        top: 50px; /* Adjust this value to position your image vertically */
+        left: 40%;
+        background: radial-gradient(circle 300px at center, #543186, #ffffff00);
     }
 </style>
