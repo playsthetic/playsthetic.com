@@ -1,5 +1,19 @@
-<nav class="head-nav">
-    <h3>Playsthetic</h3>
+<nav class="head-nav bg-color">
+    <!-- <h3>Playsthetic</h3> -->
+
+    <div class="icons text-color">
+        <a href="https://twitter.com/playsthetic"
+            ><i class="fab fa-twitter"></i></a
+        >
+        <a href="https://www.youtube.com/channel/UC9_9fD79DqRTZ2Y04G_p8iQ"
+            ><i class="fab fa-youtube"></i></a
+        >
+        <a href=""><i class="fab fa-discord"></i></a>
+        <a href="https://github.com/playsthetic"
+            ><i class="fab fa-github"></i></a
+        >
+        <a href=""><i class="fab fa-steam"></i></a>
+    </div>
 </nav>
 
 <style>
@@ -9,8 +23,25 @@
         background-color: transparent;
         transition: background-color 0.5s ease-in-out;
         z-index: 1000;
-        padding: 20px;
-        background-color: #171717;
-        border-bottom: #333333 solid 1px;
+        padding: 20px 30px;
+        /* border-bottom: #333333 solid 1px; */
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .icons {
+        display: flex;
+        gap: 20px; /* Adjust this value to add space between the icons */
+    }
+
+    i {
+        padding: 0;
+        margin: 0;
+        font-size: 1.5rem;
+        cursor: pointer;
+        opacity: 75%;
+    }
+    i:hover {
+        opacity: 100%;
     }
 </style>

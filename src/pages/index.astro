@@ -1,5 +1,6 @@
 ---
 import "@fontsource-variable/inter";
+import "@fontsource-variable/rubik";
 
 import HeadNav from "../components/HeadNav.astro";
 import ScrollNav from "../components/ScrollNav.astro";
@@ -25,24 +26,28 @@ import About from "../components/sections/About.astro";
         <title>Playsthetic</title>
     </head>
     <body>
-        <!-- <HeadNav /> -->
+        <HeadNav />
         <div class="holder">
             <Splash />
-            <Montezuma />
+            <!-- <Montezuma />
             <Punch />
-            <Swordfish />
-            <About />
+            <Swordfish /> -->
+            <!-- <About /> -->
         </div>
-        <ScrollNav />
+        <!-- <ScrollNav /> -->
     </body>
 </html>
 
-<style is:global>
+<style lang="scss" is:global>
+    $text-color: rgb(63, 63, 63);
+    $background-color: rgb(218, 214, 214);
+
     body {
-        font-family: "Inter Variable";
+        font-family: "Rubik Variable";
         font-size: 14px;
-        color: #898989;
-        background: radial-gradient(circle at center, rgb(48, 48, 48), #171717);
+        color: $text-color;
+        background-color: $background-color;
+        /* background: radial-gradient(circle at center, rgb(48, 48, 48), #171717); */
     }
 
     .holder {
@@ -53,14 +58,13 @@ import About from "../components/sections/About.astro";
     .section {
         position: relative;
         height: 100vh;
-        /* justify-content: center;
-        align-items: center; */
         scroll-snap-align: start;
-        /* box-sizing: border-box; */
     }
     .content {
         position: relative;
-        padding: 300px;
+        padding-top: 0px;
+        padding-left: 300px;
+        padding-right: 300px;
         height: 100vh;
     }
 
@@ -69,15 +73,18 @@ import About from "../components/sections/About.astro";
         padding: 20px;
     }
 
-    .fa-solid {
-        color: rgb(147, 95, 232);
+    .fa-solid,
+    .fa-brands {
+        color: #2cd48c;
         font-size: 50px;
         padding-bottom: 15px;
         padding-left: 5px;
     }
 
     .deck {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-auto-rows: minmax(100px, auto);
         flex-wrap: wrap;
         justify-content: space-between;
     }
@@ -85,39 +92,54 @@ import About from "../components/sections/About.astro";
     .card {
         flex: 1;
         margin: 10px;
-        background: rgb(53, 53, 53);
+        background: lighten($background-color, 2%);
         border-radius: 5px;
         padding: 20px;
-        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+        // box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
     }
 
+    hr {
+        border: 0;
+        height: 2px;
+        background: rgb(63, 63, 63);
+        margin: 0px 0px 20px 0px;
+    }
     h1 {
         font-size: 50px;
         font-weight: bold;
     }
 
     h2 {
-        font-size: 60px;
-        color: rgb(234, 234, 234);
-        padding-bottom: 20px;
-        font-weight: bold;
+        font-size: 22px;
+        padding-bottom: 15px;
+        // font-weight: bold;
+        text-transform: uppercase;
     }
 
     h3 {
         font-size: 20px;
-        color: rgb(214, 214, 214);
         padding-bottom: 20px;
         font-weight: bold;
+        text-transform: uppercase;
     }
 
     h4 {
+        text-transform: uppercase;
         margin-bottom: 10px;
-        font-size: 16px;
-        color: rgb(248, 248, 248);
+        font-size: 14px;
+        font-weight: bold;
     }
 
     a {
         color: inherit; /* Inherit the color from the parent element */
         text-decoration: none; /* Remove the underline */
+    }
+
+    .bg-color {
+        background-colorlor: $background-color;
+    }
+
+    .text-color {
+        color: $text-color;
     }
 </style>

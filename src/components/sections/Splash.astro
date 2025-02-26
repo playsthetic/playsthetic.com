@@ -1,49 +1,71 @@
+---
+import Footer from "../Footer.astro";
+---
+
 <div id="splash" class="section">
     <div class="content">
-        <img id="background-image" src="splash.png" />
-        <h1>Playsthetic</h1>
-        <h2>We make it, you play it</h2>
-        <h3>Our design philosophy</h3>
+        <!-- <img id="background-image" src="splash.png" /> -->
+        <!-- <h1>Playsthetic</h1> -->
+        <img src="logo.png" alt="Playsthetic" class="-translate-x-11" />
+        <h2>A tiny game studio with principles</h2>
+        <hr />
+
         <div class="deck">
             <div class="card">
-                <i class="fa-solid fa-ghost"></i>
-                <h4>Retrofitting</h4>
+                <i class="fa-solid fa-eye"></i>
+                <h4>Strong vision</h4>
                 <p>
-                    Video game history is rich and diverse. We explore the past
-                    to build a better future.
+                    We can't please everyone, but we can make a few very happy.
                 </p>
             </div>
             <div class="card">
-                <i class="fa-solid fa-coins"></i>
-                <h4>Pay to play</h4>
+                <i class="fa-solid fa-building-columns"></i>
+                <h4>Old is gold</h4>
                 <p>
-                    No slot machines, no carrot keeping you running. We respect
-                    your time like you do ours.
+                    Video game history is a rich jungle where we like to
+                    venture.
                 </p>
             </div>
             <div class="card">
-                <i class="fa-solid fa-baseball"></i>
-                <h4>Throwing curves</h4>
+                <i class="fa-solid fa-shoe-prints"></i>
+                <h4>One step ahead</h4>
                 <p>
-                    It's our role to be a step ahead and take things in a
-                    direction your don't expect.
+                    It's our role to take you in a direction your don't expect.
                 </p>
             </div>
             <div class="card">
-                <i class="fa-solid fa-handshake-slash"></i>
-                <h4>No compromise</h4>
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <h4>Polish matters</h4>
+                <p>It's the little things that make all the difference.</p>
+            </div>
+            <div class="card">
+                <i class="fa-solid fa-clock"></i>
+                <h4>Clocks on walls</h4>
                 <p>
-                    We deliver a vision. We can't please everyone, but we can
-                    make a few very happy.
+                    We're not a casino. We respect your time like you do ours.
                 </p>
+            </div>
+            <div class="card">
+                <i class="fa-solid fa-baby-carriage"></i>
+                <h4>Keep it small</h4>
+                <p>
+                    We like it lean and smart. We aim to do a lot with very
+                    little.
+                </p>
+            </div>
+            <div class="card">
+                <i class="fa-brands fa-osi"></i>
+                <h4>Open source</h4>
+                <p>We share what we can when it seems worth it.</p>
             </div>
         </div>
     </div>
+    <Footer />
 </div>
 
 <style>
     h1 {
-        background: -webkit-linear-gradient(45deg, #5eff55, #ffffff);
+        background: -webkit-linear-gradient(45deg, #00ea00, #ffffff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
