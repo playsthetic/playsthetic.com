@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import FoilBand from '../components/FoilBand.astro';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const logo = `${base}/logo.svg`;
@@ -63,8 +64,6 @@ const socials = [
 				}
 			</nav>
 		</div>
-
-		<span class="hud__corner hud__corner--bottom" data-scramble="540">© {year} {name}</span>
 	</div>
 
 	<main class="stage">
@@ -76,6 +75,8 @@ const socials = [
 
 		<p class="tagline" data-scramble="120">{tagline}</p>
 	</main>
+
+	<FoilBand note={`© ${year} ${name}`} />
 
 	<div class="grain" aria-hidden="true"></div>
 </Layout>
@@ -104,10 +105,6 @@ const socials = [
 		align-items: center;
 		justify-content: space-between;
 		gap: 1.5em;
-	}
-
-	.hud__corner--bottom {
-		align-self: flex-start;
 	}
 
 	.hud__links {
@@ -276,8 +273,7 @@ const socials = [
 	/* Text fades in bare and lets the scramble do the rest of the work. */
 	.tagline,
 	.hud__status,
-	.hud__link,
-	.hud__corner--bottom {
+	.hud__link {
 		opacity: 0;
 		animation: fade 0.25s linear forwards;
 	}
@@ -299,9 +295,6 @@ const socials = [
 	}
 	.hud__link:nth-child(4) {
 		animation-delay: 0.58s;
-	}
-	.hud__corner--bottom {
-		animation-delay: 0.64s;
 	}
 
 	@keyframes cut-in {
@@ -325,14 +318,15 @@ const socials = [
 		.mark,
 		.tagline,
 		.hud__status,
-		.hud__link,
-		.hud__corner--bottom {
+		.hud__link {
 			opacity: 1;
 		}
 	}
 </style>
 
 <script>
+	import { acid, driftAcid } from '../scripts/acid';
+
 	/*
 	 * Two effects, both optional. The mark renders through a fragment shader
 	 * that keeps it permanently melting, harder wherever the pointer is. The
@@ -501,12 +495,6 @@ const socials = [
 		return shader;
 	}
 
-	function srgb(color: string): [number, number, number] {
-		const m = color.match(/\d+(\.\d+)?/g);
-		if (!m || m.length < 3) return [1, 1, 1];
-		return [+m[0] / 255, +m[1] / 255, +m[2] / 255];
-	}
-
 	async function renderMark() {
 		const mark = document.querySelector<HTMLElement>('.mark');
 		const canvas = mark?.querySelector<HTMLCanvasElement>('.mark__gl');
@@ -558,7 +546,6 @@ const socials = [
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.uniform1i(u.tex, 0);
-		gl.uniform3fv(u.bg, srgb(getComputedStyle(document.body).backgroundColor));
 
 		// Matches the 83.333% inset the fallback <img> uses.
 		const INSET = 0.8333;
@@ -613,6 +600,17 @@ const socials = [
 		// Pointer speed, in mark-widths a second, that counts as a full wake.
 		const WAKE_SPEED = 2.6;
 
+		// The disturbance travels through something, and that something has a
+		// speed limit. Outrun it and it arrives late rather than keeping up: this
+		// is what stops a fast flick from dragging the melt along at cursor speed.
+		const MAX_SPEED = 1.1;
+
+		// With only a speed cap, waving the cursor around fast enough for long
+		// enough strands the disturbance off the artwork entirely, and the mark
+		// goes quiet at the exact moment it should be at its wildest. So the gap
+		// is leashed: it may fall a full mark-width behind and no further.
+		const MAX_LAG = 1.0;
+
 		// Pointer position in the canvas' own uv space, plus how present the
 		// pointer is at all. Influence fades rather than teleporting away, so
 		// leaving the window relaxes the water instead of cutting it off.
@@ -661,13 +659,35 @@ const socials = [
 			// velocity. Stable at the frame rates the dt clamp allows.
 			vel.x += (-STIFFNESS * (eased.x - target.x) - DAMPING * vel.x) * dt;
 			vel.y += (-STIFFNESS * (eased.y - target.y) - DAMPING * vel.y) * dt;
+
+			// What the spring wanted to do, before the medium gets a say. The wake
+			// reads this rather than the capped value, so a flick still registers
+			// as fast even though the disturbance itself cannot travel that fast.
+			const attempt = Math.hypot(vel.x, vel.y);
+			if (attempt > MAX_SPEED) {
+				const brake = MAX_SPEED / attempt;
+				vel.x *= brake;
+				vel.y *= brake;
+			}
+
 			eased.x += vel.x * dt;
 			eased.y += vel.y * dt;
+
+			// Position-only correction, so the spring keeps its own velocity and
+			// still settles normally once the pointer stops.
+			const gapX = target.x - eased.x;
+			const gapY = target.y - eased.y;
+			const gap = Math.hypot(gapX, gapY);
+			if (gap > MAX_LAG) {
+				const take = (gap - MAX_LAG) / gap;
+				eased.x += gapX * take;
+				eased.y += gapY * take;
+			}
 
 			// Speed comes off the spring, which is already smooth, rather than off
 			// raw pointer deltas. Those arrive in irregular bursts, and reading
 			// them per frame is what made the wake flicker.
-			const speed = Math.min(Math.hypot(vel.x, vel.y) / WAKE_SPEED, 1);
+			const speed = Math.min(attempt / WAKE_SPEED, 1);
 			wake += (speed - wake) * (1 - Math.exp(-dt * (speed > wake ? 6 : 2.2)));
 			hover += ((hovering ? 1 : 0) - hover) * (1 - Math.exp(-dt * (hovering ? 12 : 3.5)));
 
@@ -675,6 +695,9 @@ const socials = [
 			gl.uniform1f(u.wake, wake);
 			gl.uniform1f(u.hover, hover);
 			gl.uniform2f(u.mouse, eased.x, eased.y);
+			// Re-read every frame: the page colour drifts, and the mark is cut out
+			// of it, so a stale value would show up as a seam around the artwork.
+			gl.uniform3fv(u.bg, acid());
 			gl.drawArrays(gl.TRIANGLES, 0, 3);
 			requestAnimationFrame(frame);
 		};
@@ -682,6 +705,10 @@ const socials = [
 		requestAnimationFrame(frame);
 		mark.classList.add('is-live');
 	}
+
+	// Outside the guard on purpose: the drift decides for itself whether to move,
+	// and the shaders need a colour to read either way.
+	driftAcid();
 
 	if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
 		document.querySelectorAll<HTMLElement>('[data-scramble]').forEach((el) => {
