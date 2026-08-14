@@ -221,15 +221,9 @@ const { note } = Astro.props;
 		// grain stays put instead of stretching with the viewport.
 		const float CELL = 26.0;
 
-		/*
-		 * Rings of spectrum from the middle of a cell to its corner, how far the
-		 * view drags them off-centre, and how many rings pass through for a full
-		 * swing of the tilt. Unlike the angular version there is no seam to line
-		 * up here, so none of these has to be a whole number.
-		 */
-		const float RINGS = 2.2;
-		const float RING_SKEW = 1.3;
-		const float RING_SLIDE = 0.55;
+		// Turns of the spectrum per turn around a cell's centre. It has to be a
+		// whole number or the hue tears along the seam at half a turn.
+		const float SPECTRUM_TURNS = 1.0;
 
 		// How tight the sheen runs, and how far the colour is allowed from white.
 		// Prism foil is a mirror with a rainbow in it, not a rainbow.
@@ -256,9 +250,9 @@ const { note } = Astro.props;
 		 */
 		const float TILT_TURN = 2.36;  // 0.75 of a half turn
 
-		// Tooling rings per cell width. Kept low: at any real density they alias
-		// into moire long before they read as grooves.
-		const float RULING_RINGS = 0.5;
+		// Spokes of tooling around a cell. Kept low: at any real density they
+		// alias into moire long before they read as grooves.
+		const float RULING_SPOKES = 14.0;
 
 		// How steeply each cell is embossed, as in-plane slope from its middle to
 		// its edge. Parallax alone cannot put a spectrum inside a cell this small:
@@ -314,17 +308,18 @@ const { note } = Astro.props;
 			float checker = mod(id.x + id.y, 2.0);
 
 			/*
-			 * Each square is struck as a shallow dome. A curved mirror sends a
-			 * different angle to the eye at every distance from its middle, so the
-			 * spectrum comes out in rings running out from the centre. The rings
-			 * pass through as the view turns, which is the whole of the movement.
+			 * Each square is spun rather than ruled straight: the tooling turns
+			 * about the cell's middle, so the grooves are spokes and the colour
+			 * runs with the angle around that middle, every hue converging on the
+			 * one point. Concentric rings cannot do this. They give two opposed
+			 * lobes and no convergence, because the angle only ever enters as its
+			 * cosine.
 			 */
 			vec2 fromCentre = f + vec2(1e-5);
-			float r = length(fromCentre);
 			float theta = atan(fromCentre.y, fromCentre.x);
 
 			// The pattern is anchored to the light-to-eye path, so moving your head
-			// works the rings rather than leaving them where they are.
+			// spins the whole sweep about the centre rather than sliding it.
 			vec2 sweep = toEye.xy + toLight.xy;
 
 			// Seen straight on, that path has no in-plane direction at all, and the
@@ -334,34 +329,29 @@ const { note } = Astro.props;
 			sweep = mix(toLight.xy, sweep, smoothstep(0.0, 0.35, length(sweep)));
 			float azimuth = atan(sweep.y, sweep.x) + u_tilt.x * TILT_TURN;
 
-			/*
-			 * Rings out from the middle, pulled off-centre by the view so the set
-			 * is not perfectly concentric, and slid through as the angle changes.
-			 * Neighbours sit half a turn of the spectrum apart, which is what keeps
-			 * the checkerboard now that every cell is struck alike.
-			 */
-			float phase = r * RINGS
-				+ dot(sweep, fromCentre) * RING_SKEW
-				- u_tilt.x * RING_SLIDE
-				+ checker * 0.5;
+			// Spun one way here and the other way next door, and half a turn of the
+			// spectrum apart, so neighbours land on opposite colours. With every
+			// cell tooled alike that handedness is what keeps the checkerboard.
+			float spin = checker < 0.5 ? 1.0 : -1.0;
+			float phase = (theta * spin - azimuth) / TAU * SPECTRUM_TURNS + checker * 0.5;
 			vec3 hue = mix(vec3(1.0), spectrum(phase), SATURATION);
 
-			// A dome is brighter down one side than the other, and the side turns
+			// Spun metal is bright where the grooves lie across the light and dark
+			// where they run along it: two lobes, opposite one another, turning
 			// with the view.
 			float thrown = abs(cos(theta - azimuth));
 
-			// Bowed the opposite way next door, so the sheen breaks at the seam
-			// instead of running straight through it.
-			float bow = checker < 0.5 ? 1.0 : -1.0;
-			vec3 normal = normalize(vec3(-fromCentre * EMBOSS * bow, 1.0));
+			// The cell is struck as a shallow dome, bowed the opposite way next
+			// door, so the sheen breaks at the seam instead of running through it.
+			vec3 normal = normalize(vec3(-fromCentre * EMBOSS * spin, 1.0));
 			vec3 mirror = reflect(-toLight, normal);
 			float sheen = pow(max(dot(mirror, toEye), 0.0), SHARPNESS);
 
-			// The tooling itself, as grain. Rings again, and faded out near the
-			// middle where they would crowd together and alias.
-			float ruling = sin(r * CELL * RULING_RINGS);
+			// The grooves themselves, as grain. Faded out near the middle, where
+			// spokes this fine would only alias.
+			float ruling = sin(theta * RULING_SPOKES);
 			float glint = smoothstep(0.55, 1.0, ruling)
-				* smoothstep(0.0, 0.22, r) * 0.03;
+				* smoothstep(0.0, 0.22, length(fromCentre)) * 0.03;
 
 			// Foil is scored between the cells, so the seams catch first. Faint:
 			// any stronger and the grid reads as drawn rather than as tooling.
