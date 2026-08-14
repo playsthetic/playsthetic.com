@@ -1,51 +1,90 @@
 ---
 interface Props {
 	title: string;
+	description: string;
 }
 
-const { title } = Astro.props;
+const { title, description } = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="description" content="Astro description" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="generator" content={Astro.generator} />
+
 		<title>{title}</title>
+		<meta name="description" content={description} />
+		{canonical && <link rel="canonical" href={canonical} />}
+
+		<link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+		<link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png`} />
+		<meta name="theme-color" content="#d2f000" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		{canonical && <meta property="og:url" content={canonical} />}
+		{canonical && <meta property="og:image" content={new URL(`${base}/og.jpg`, canonical).href} />}
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content={title} />
+		<meta name="twitter:card" content="summary_large_image" />
 	</head>
 	<body>
 		<slot />
 	</body>
 </html>
+
 <style is:global>
+	/*
+	 * Fixed brand palette: flat acid, flat black, nothing in between. The site
+	 * does not follow the OS theme.
+	 */
 	:root {
-		--accent: 136, 58, 234;
-		--accent-light: 224, 204, 250;
-		--accent-dark: 49, 10, 101;
-		--accent-gradient: linear-gradient(
-			45deg,
-			rgb(var(--accent)),
-			rgb(var(--accent-light)) 30%,
-			white 60%
-		);
+		color-scheme: only light;
+
+		--acid: #d2f000;
+		--ink: #000000;
+
+		--mono:
+			ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+			'Liberation Mono', monospace;
 	}
-	html {
-		font-family: system-ui, sans-serif;
-		background: #13151a;
-		background-size: 224px;
+
+	*,
+	*::before,
+	*::after {
+		box-sizing: border-box;
 	}
-	code {
-		font-family:
-			Menlo,
-			Monaco,
-			Lucida Console,
-			Liberation Mono,
-			DejaVu Sans Mono,
-			Bitstream Vera Sans Mono,
-			Courier New,
-			monospace;
+
+	html,
+	body {
+		height: 100%;
+	}
+
+	body {
+		margin: 0;
+		background: var(--acid);
+		color: var(--ink);
+		font-family: var(--mono);
+		font-synthesis-weight: none;
+		-webkit-font-smoothing: antialiased;
+		overflow: hidden;
+		overscroll-behavior: none;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+		}
 	}
 </style>
