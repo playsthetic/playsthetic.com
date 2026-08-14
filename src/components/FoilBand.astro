@@ -192,7 +192,7 @@ const { note } = Astro.props;
 </style>
 
 <script>
-	import { acid, driftAcid } from '../scripts/acid';
+	import { backdropAt, driftAcid } from '../scripts/acid';
 
 	/* Shader ----------------------------------------------------------- */
 
@@ -236,6 +236,19 @@ const { note } = Astro.props;
 		// spectrum a visitor can turn up by crossing the page.
 		const float EYE_DIST = 700.0;
 		const float EYE_TRAVEL = 700.0;
+
+		/*
+		 * How far the tilt turns the sweep directly, on top of the geometry.
+		 *
+		 * The geometry alone will not do it. The in-plane part of a view direction
+		 * can never be longer than one, and the light does not move, so the anchor
+		 * the two define together swings only about a hundred degrees end to end,
+		 * and spends most of that near the middle of its travel: four times faster
+		 * there than at the ends, which reads as a pattern that sits still and then
+		 * lurches. Turning it with the tilt as well spends most of the spectrum
+		 * over the range and levels the rate out.
+		 */
+		const float TILT_TURN = 2.36;  // 0.75 of a half turn
 
 		// Spokes of tooling around a cell. Kept low: at any real density they
 		// alias into moire long before they read as grooves.
@@ -314,7 +327,7 @@ const { note } = Astro.props;
 			// frame. Near that point, hand the direction back to the light, which
 			// always has one.
 			sweep = mix(toLight.xy, sweep, smoothstep(0.0, 0.35, length(sweep)));
-			float azimuth = atan(sweep.y, sweep.x);
+			float azimuth = atan(sweep.y, sweep.x) + u_tilt.x * TILT_TURN;
 
 			// Spun one way here and the other way next door, and half a turn of the
 			// spectrum apart, so neighbours land on opposite colours. With every
@@ -509,9 +522,17 @@ const { note } = Astro.props;
 			lip: gl.getUniformLocation(program, 'u_lip'),
 		};
 
+		// Where the band sits, for sampling the page gradient. Cached rather than
+		// measured per frame: reading layout every frame to place a tenth of a
+		// tint is not worth the reflow.
+		const centre = { x: 0, y: 0 };
+
 		const resize = () => {
 			// The canvas, not the footer: it stands taller by the overhang.
 			const rect = canvas.getBoundingClientRect();
+			centre.x = rect.left + rect.width / 2;
+			centre.y = rect.top + rect.height / 2;
+
 			const dpr = Math.min(window.devicePixelRatio || 1, 2);
 			const w = Math.max(1, Math.round(rect.width * dpr));
 			const h = Math.max(1, Math.round(rect.height * dpr));
@@ -530,27 +551,37 @@ const { note } = Astro.props;
 		resize();
 		new ResizeObserver(resize).observe(strip);
 
-		const idle = { x: 0, y: 0 };
-		const pointer = { x: 0, y: 0, seen: false };
+		/*
+		 * Two ways in, and only two: the camera when it is on, otherwise a slow
+		 * ping-pong. The pointer is deliberately not one of them. The foil is a
+		 * surface being looked at, not a control, and tying it to the cursor made
+		 * it read as a thing you operate.
+		 */
+		const WANDER_PERIOD = 24; // seconds for a full there and back
+		const WANDER = 0.85;
+
+		/*
+		 * A triangle, not a sine. A sine spends most of its time near its ends,
+		 * where its speed falls to nothing, and that reads as a pause at each
+		 * extreme rather than as a pass. A triangle holds one speed the whole way
+		 * across; the follow filter below rounds off the turn, so nothing snaps.
+		 */
+		const pingPong = (seconds: number, period: number, offset: number) => {
+			const u = (seconds / period + offset) % 1;
+			return 1 - 4 * Math.abs(u - 0.5);
+		};
+
 		const head = { x: 0, y: 0, live: false };
 
-		// A spring again: head tracking especially is far too jittery to use raw.
-		const STIFFNESS = 18;
-		const DAMPING = 2 * Math.sqrt(18) * 0.85;
+		/*
+		 * How quickly the foil catches up, per second. The camera needs it: it is
+		 * read about eleven times a second, so it has gaps to carry as well as
+		 * noise to lose. The loop barely does, being a sine already, but the same
+		 * easing carries the handover when the camera goes on or off.
+		 */
+		const HEAD_FOLLOW = 9;
+		const LOOP_FOLLOW = 13;
 		const tilt = { x: 0, y: 0 };
-		const vel = { x: 0, y: 0 };
-
-		window.addEventListener(
-			'pointermove',
-			(e) => {
-				// The full width of the window is the full swing of the angle, as if
-				// the page were a card you turn by walking across it.
-				pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-				pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
-				pointer.seen = true;
-			},
-			{ passive: true }
-		);
 
 		const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		const started = performance.now();
@@ -562,33 +593,28 @@ const { note } = Astro.props;
 			const t = (now - started) / 1000;
 
 			/*
-			 * The pointer turns the card: one side of the window to the other is
-			 * the whole swing of the angle. The vertical is kept smaller, partly
-			 * because that is how heads move, but mostly because a large vertical
-			 * swing cancels the light and steers the anchor into the blind spot
-			 * where it has no direction to point.
-			 *
-			 * The drift is now only a fallback, for a visitor who has no pointer to
-			 * move: touch, or a page nobody has touched yet. It stands down for
-			 * good the moment a real one arrives.
+			 * The vertical is kept well under the horizontal on both paths. Partly
+			 * that is how heads move, but mostly a large vertical swing cancels the
+			 * light and steers the anchor into the blind spot where it has no
+			 * direction left to point.
 			 */
-			idle.x = Math.sin(t * 0.5) * 0.62 + Math.sin(t * 0.21 + 1.7) * 0.26;
-			idle.y = Math.cos(t * 0.33) * 0.3 + Math.sin(t * 0.13 + 0.6) * 0.13;
+			const want = head.live
+				? { x: head.x, y: head.y }
+				: {
+						// Detuned, so the two axes do not turn back together.
+						x: pingPong(t, WANDER_PERIOD, 0.25) * WANDER,
+						y: pingPong(t, WANDER_PERIOD * 1.64, 0.6) * WANDER * 0.3,
+					};
 
-			let want;
-			if (head.live) want = { x: head.x, y: head.y };
-			else if (pointer.seen) want = { x: pointer.x, y: pointer.y * 0.45 };
-			else want = { x: idle.x, y: idle.y };
-
-			vel.x += (-STIFFNESS * (tilt.x - want.x) - DAMPING * vel.x) * dt;
-			vel.y += (-STIFFNESS * (tilt.y - want.y) - DAMPING * vel.y) * dt;
-			tilt.x += vel.x * dt;
-			tilt.y += vel.y * dt;
+			const follow = 1 - Math.exp(-dt * (head.live ? HEAD_FOLLOW : LOOP_FOLLOW));
+			tilt.x += (want.x - tilt.x) * follow;
+			tilt.y += (want.y - tilt.y) * follow;
 
 			gl.uniform2f(u.tilt, tilt.x, tilt.y);
-			// The strip sits flush against the page, so it tracks the drifting
-			// background rather than a colour sampled once at startup.
-			gl.uniform3fv(u.acid, acid());
+			// One sample at the band's middle is enough here: the tint is a tenth
+			// of the mix, and unlike the mark the foil is its own material rather
+			// than a hole cut in the page, so there is no edge to match.
+			gl.uniform3fv(u.acid, backdropAt(centre.x, centre.y));
 			gl.drawArrays(gl.TRIANGLES, 0, 3);
 
 			if (!still || head.live) requestAnimationFrame(frame);

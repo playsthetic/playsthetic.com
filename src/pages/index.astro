@@ -325,7 +325,7 @@ const socials = [
 </style>
 
 <script>
-	import { acid, driftAcid } from '../scripts/acid';
+	import { backdrop, driftAcid } from '../scripts/acid';
 
 	/*
 	 * Two effects, both optional. The mark renders through a fragment shader
@@ -395,8 +395,18 @@ const socials = [
 		uniform sampler2D u_tex;
 		uniform vec2 u_res;
 		uniform vec2 u_mouse;
-		uniform vec3 u_bg;
 		uniform float u_time;
+
+		// The page gradient, evaluated here rather than handed over as one colour.
+		// The mark is a hole cut in the page, so a single averaged colour would
+		// show up as a rectangle around the artwork the moment the page moved.
+		uniform vec3 u_bgA;
+		uniform vec3 u_bgB;
+		uniform vec2 u_bgDir;
+		uniform float u_bgWave;
+		uniform float u_bgPhase;
+		uniform vec2 u_origin;  // canvas top-left in viewport CSS pixels
+		uniform vec2 u_size;    // canvas size in CSS pixels
 		uniform float u_wake;
 		uniform float u_hover;
 
@@ -413,6 +423,14 @@ const socials = [
 				mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
 				f.y
 			);
+		}
+
+		// The same cosine the CSS gradient samples its stops from. A triangle here
+		// would be simpler, and is what three stops give you, but its slope turns
+		// a corner at each end and that corner draws a crease across the page.
+		vec3 backdrop(vec2 viewportPx) {
+			float t = fract(dot(viewportPx, u_bgDir) / u_bgWave - u_bgPhase);
+			return mix(u_bgA, u_bgB, 0.5 - 0.5 * cos(6.28318530718 * t));
 		}
 
 		// Ink coverage, clamped so displaced samples cannot smear off the edges.
@@ -478,7 +496,7 @@ const socials = [
 				ink(p - vec2(split, 0.0))
 			);
 
-			gl_FragColor = vec4(u_bg * (1.0 - coverage), 1.0);
+			gl_FragColor = vec4(backdrop(u_origin + v_uv * u_size) * (1.0 - coverage), 1.0);
 		}
 	`;
 
@@ -533,8 +551,14 @@ const socials = [
 			tex: gl.getUniformLocation(program, 'u_tex'),
 			res: gl.getUniformLocation(program, 'u_res'),
 			mouse: gl.getUniformLocation(program, 'u_mouse'),
-			bg: gl.getUniformLocation(program, 'u_bg'),
 			time: gl.getUniformLocation(program, 'u_time'),
+			bgA: gl.getUniformLocation(program, 'u_bgA'),
+			bgB: gl.getUniformLocation(program, 'u_bgB'),
+			bgDir: gl.getUniformLocation(program, 'u_bgDir'),
+			bgWave: gl.getUniformLocation(program, 'u_bgWave'),
+			bgPhase: gl.getUniformLocation(program, 'u_bgPhase'),
+			origin: gl.getUniformLocation(program, 'u_origin'),
+			size: gl.getUniformLocation(program, 'u_size'),
 			wake: gl.getUniformLocation(program, 'u_wake'),
 			hover: gl.getUniformLocation(program, 'u_hover'),
 		};
@@ -546,6 +570,11 @@ const socials = [
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.uniform1i(u.tex, 0);
+		// The gradient's ends and axis never change; only its phase does.
+		gl.uniform3fv(u.bgA, backdrop.a);
+		gl.uniform3fv(u.bgB, backdrop.b);
+		gl.uniform2fv(u.bgDir, backdrop.dir);
+		gl.uniform1f(u.bgWave, backdrop.wavelength);
 
 		// Matches the 83.333% inset the fallback <img> uses.
 		const INSET = 0.8333;
@@ -563,6 +592,14 @@ const socials = [
 
 		const resize = () => {
 			const rect = mark.getBoundingClientRect();
+
+			// Where the mark sits in the viewport, so the shader can look up the
+			// page gradient at the right place. Set before the early return: the
+			// window can change shape while the mark, being clamped, does not, and
+			// the artwork would then be reading the gradient from its old position.
+			gl.uniform2f(u.origin, rect.left, rect.top);
+			gl.uniform2f(u.size, rect.width, rect.height);
+
 			const dpr = Math.min(window.devicePixelRatio || 1, 2);
 			const w = Math.max(1, Math.round(rect.width * dpr));
 			const h = Math.max(1, Math.round(rect.height * dpr));
@@ -583,6 +620,7 @@ const socials = [
 
 		resize();
 		new ResizeObserver(resize).observe(mark);
+		window.addEventListener('resize', resize, { passive: true });
 
 		/*
 		 * The shader never sees the raw pointer. A spring chases it, and the
@@ -695,9 +733,9 @@ const socials = [
 			gl.uniform1f(u.wake, wake);
 			gl.uniform1f(u.hover, hover);
 			gl.uniform2f(u.mouse, eased.x, eased.y);
-			// Re-read every frame: the page colour drifts, and the mark is cut out
-			// of it, so a stale value would show up as a seam around the artwork.
-			gl.uniform3fv(u.bg, acid());
+			// Re-read every frame: the page gradient pans, and the mark is cut out
+			// of it, so a stale phase would show up as a seam around the artwork.
+			gl.uniform1f(u.bgPhase, backdrop.phase());
 			gl.drawArrays(gl.TRIANGLES, 0, 3);
 			requestAnimationFrame(frame);
 		};
