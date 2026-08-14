@@ -468,52 +468,21 @@ const socials = [
 				noise(uv * 5.5 + 12.3 - u_time * 0.47)
 			) - 0.5) * (0.1 + 0.045 * u_wake) * pull;
 
-			// How far the plates have drifted apart. A slow-breathing amount at
+			// How far the channels are pulled apart. A slow-breathing amount at
 			// rest, more under the pointer, on two detuned breaths so it never
 			// settles into an obvious loop.
 			float split = 0.0068 + 0.0022 * sin(u_time * 0.7) + 0.0014 * sin(u_time * 1.63)
 				+ pull * (0.0072 + 0.011 * u_wake);
 
-			/*
-			 * Four plates out of register rather than three channels pulled apart.
-			 *
-			 * A lens splits light, so an RGB aberration adds: three separate reads,
-			 * one per channel. A press splits the image, and ink subtracts: each
-			 * plate takes its own part of the spectrum out of whatever is behind it,
-			 * so the four multiply together. That is why this is a product and not
-			 * three lookups, and why the fringes come out cyan, magenta and yellow
-			 * instead of red and green.
-			 *
-			 * The plates sit at the angles a printer would screen them at, and black
-			 * holds still: it is the key plate, the one the others are registered
-			 * against, so the silhouette stays sharp and only the colour creeps out
-			 * from under its edge.
-			 */
-			vec2 aspectFix = vec2(1.0, aspect);
-			float cyan = ink(p + vec2(0.966, 0.259) * split * aspectFix);
-			float magenta = ink(p + vec2(0.259, -0.966) * split * aspectFix);
-			float yellow = ink(p - vec2(0.966, 0.259) * split * aspectFix);
-			float key = ink(p);
+			// Channel split: the silhouette read three times, a step apart, one read
+			// per channel. Additive, the way a lens separates light.
+			vec3 coverage = vec3(
+				ink(p + vec2(split, 0.0)),
+				ink(p),
+				ink(p - vec2(split, 0.0))
+			);
 
-			/*
-			 * The plates lay ink down rather than filter what is behind them.
-			 *
-			 * Filtering is the truer model of ink on white, and on this page it does
-			 * nothing: acid has no blue in it, so the yellow plate has nothing to
-			 * subtract and disappears, while cyan and magenta come through as plain
-			 * green and red. Printing each plate in its own colour is what makes a
-			 * misregistered edge read as cyan, magenta and yellow on any stock.
-			 *
-			 * Laid down in press order, black last, so the silhouette stays solid
-			 * and the colour only shows where a plate has crept out from under it.
-			 */
-			vec3 sheet = u_bg;
-			sheet = mix(sheet, vec3(1.0, 0.94, 0.0), yellow);
-			sheet = mix(sheet, vec3(0.93, 0.0, 0.55), magenta);
-			sheet = mix(sheet, vec3(0.0, 0.67, 0.93), cyan);
-			sheet = mix(sheet, vec3(0.0), key);
-
-			gl_FragColor = vec4(sheet, 1.0);
+			gl_FragColor = vec4(u_bg * (1.0 - coverage), 1.0);
 		}
 	`;
 
