@@ -201,7 +201,7 @@ const { note } = Astro.props;
 
 		// A diamond across, in CSS pixels rather than in band heights, so the
 		// grain stays put instead of stretching with the viewport.
-		const float CELL = 19.0;
+		const float CELL = 26.0;
 
 		// Turns of the spectrum per turn around a cell's centre. It has to be a
 		// whole number or the hue tears along the seam at half a turn.
@@ -217,7 +217,7 @@ const { note } = Astro.props;
 		// angle changes from one side of the band to the other, so it is also
 		// what sets how many bands of colour are on screen at once.
 		const float EYE_DIST = 700.0;
-		const float EYE_TRAVEL = 520.0;
+		const float EYE_TRAVEL = 700.0;
 
 		// Spokes of tooling around a cell. Kept low: at any real density they
 		// alias into moire long before they read as grooves.
@@ -273,6 +273,12 @@ const { note } = Astro.props;
 			// The pattern is anchored to the light-to-eye path, so moving your head
 			// spins the whole sweep about the centre rather than sliding it.
 			vec2 sweep = toEye.xy + toLight.xy;
+
+			// Seen straight on, that path has no in-plane direction at all, and the
+			// anchor is free to snap anywhere: the whole band whips round for a
+			// frame. Near that point, hand the direction back to the light, which
+			// always has one.
+			sweep = mix(toLight.xy, sweep, smoothstep(0.0, 0.35, length(sweep)));
 			float azimuth = atan(sweep.y, sweep.x);
 
 			// Spun one way here and the other way next door, and half a turn of the
@@ -509,9 +515,17 @@ const { note } = Astro.props;
 			last = now;
 			const t = (now - started) / 1000;
 
-			// Two detuned sines per axis: a wander rather than a loop.
-			idle.x = Math.sin(t * 0.29) * 0.5 + Math.sin(t * 0.11 + 1.7) * 0.22;
-			idle.y = Math.cos(t * 0.19) * 0.34 + Math.sin(t * 0.07 + 0.6) * 0.16;
+			/*
+			 * Two detuned sines per axis: a wander rather than a loop. With no
+			 * camera this is the only thing turning the foil, so it has to be quick
+			 * enough to read as movement on its own. As set, it swings the sweep
+			 * through about a third of the colour wheel, peaking near 70 degrees a
+			 * second. The vertical runs smaller than the horizontal, both because
+			 * heads move that way and because a large vertical swing cancels the
+			 * light and sends the anchor through its blind spot.
+			 */
+			idle.x = Math.sin(t * 0.5) * 0.62 + Math.sin(t * 0.21 + 1.7) * 0.26;
+			idle.y = Math.cos(t * 0.33) * 0.3 + Math.sin(t * 0.13 + 0.6) * 0.13;
 
 			const want = head.live
 				? { x: head.x, y: head.y }
