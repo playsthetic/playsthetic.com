@@ -203,10 +203,12 @@ const { note } = Astro.props;
 		// grain stays put instead of stretching with the viewport.
 		const float CELL = 19.0;
 
-		// How hard the grating splits the spectrum, how tight the sheen runs, and
-		// how far the colour is allowed from white. Prism foil is a mirror with a
-		// rainbow in it, not a rainbow.
-		const float DISPERSION = 2.4;
+		// Turns of the spectrum per turn around a cell's centre. It has to be a
+		// whole number or the hue tears along the seam at half a turn.
+		const float SPECTRUM_TURNS = 1.0;
+
+		// How tight the sheen runs, and how far the colour is allowed from white.
+		// Prism foil is a mirror with a rainbow in it, not a rainbow.
 		const float SHARPNESS = 3.5;
 		const float SATURATION = 0.34;
 
@@ -217,9 +219,9 @@ const { note } = Astro.props;
 		const float EYE_DIST = 700.0;
 		const float EYE_TRAVEL = 520.0;
 
-		// Track spacing, as rings per cell radius. Kept low: at any real density
-		// the tracks alias into moire long before they read as tracks.
-		const float RULING_FREQ = 0.5;
+		// Spokes of tooling around a cell. Kept low: at any real density they
+		// alias into moire long before they read as grooves.
+		const float RULING_SPOKES = 14.0;
 
 		// How steeply each cell is embossed, as in-plane slope from its middle to
 		// its edge. Parallax alone cannot put a spectrum inside a cell this small:
@@ -258,55 +260,53 @@ const { note } = Astro.props;
 			float checker = mod(id.x + id.y, 2.0);
 
 			/*
-			 * Each square is struck like a tiny CD: the rulings run as concentric
-			 * circles around its middle. A grating throws its spectrum across its
-			 * rulings, and across a circle is radial, so the colour sweeps around
-			 * the centre of every cell rather than running straight over it. That
-			 * polar sweep is what a disc does and what a ruled line cannot.
+			 * Each square is spun rather than ruled straight: the tooling turns
+			 * about the cell's middle, so the grooves are spokes and the colour
+			 * runs with the angle around that middle, every hue converging on the
+			 * one point. Concentric rings cannot do this. They give two opposed
+			 * lobes and no convergence, because the angle only ever enters as its
+			 * cosine.
 			 */
 			vec2 fromCentre = f + vec2(1e-5);
-			vec2 grating = normalize(fromCentre);
+			float theta = atan(fromCentre.y, fromCentre.x);
 
-			// Struck one way here and the other way next door. With every cell now
-			// ruled alike, the alternating bow is what keeps the checkerboard.
-			float bow = checker < 0.5 ? 1.0 : -1.0;
+			// The pattern is anchored to the light-to-eye path, so moving your head
+			// spins the whole sweep about the centre rather than sliding it.
+			vec2 sweep = toEye.xy + toLight.xy;
+			float azimuth = atan(sweep.y, sweep.x);
 
-			// The cell is a dome, so the normal turns from its middle out to its
-			// edges, and flips back hard at the seam into the next one.
-			vec3 normal = normalize(vec3(-fromCentre * EMBOSS * bow, 1.0));
-
-			// The grating direction, laid onto the tilted face.
-			vec3 flat3 = vec3(grating, 0.0);
-			vec3 ruled = normalize(flat3 - normal * dot(flat3, normal));
-
-			// First-order grating equation, near enough: the wavelength sent to the
-			// eye follows the angles of the light and the eye measured across the
-			// rulings. Both are per-pixel, so the spectrum sweeps across the cell.
-			float phase = (dot(toEye, ruled) + dot(toLight, ruled)) * DISPERSION;
+			// Spun one way here and the other way next door, and half a turn of the
+			// spectrum apart, so neighbours land on opposite colours. With every
+			// cell tooled alike that handedness is what keeps the checkerboard.
+			float spin = checker < 0.5 ? 1.0 : -1.0;
+			float phase = (theta * spin - azimuth) / TAU * SPECTRUM_TURNS + checker * 0.5;
 			vec3 hue = mix(vec3(1.0), spectrum(phase), SATURATION);
 
-			// How much of the light this cell throws at the eye at all. Cells ruled
-			// across the light-to-eye direction send the most, which is why the
-			// checkerboard alternates in brightness and not only in colour.
-			vec2 half2 = toEye.xy + toLight.xy;
-			float thrown = abs(dot(normalize(half2 + vec2(1e-5)), grating));
+			// Spun metal is bright where the grooves lie across the light and dark
+			// where they run along it: two lobes, opposite one another, turning
+			// with the view.
+			float thrown = abs(cos(theta - azimuth));
 
-			// Sheen around the mirror direction, off the embossed normal.
+			// The cell is struck as a shallow dome, bowed the opposite way next
+			// door, so the sheen breaks at the seam instead of running through it.
+			vec3 normal = normalize(vec3(-fromCentre * EMBOSS * spin, 1.0));
 			vec3 mirror = reflect(-toLight, normal);
 			float sheen = pow(max(dot(mirror, toEye), 0.0), SHARPNESS);
 
-			// The rulings themselves, as grain rather than as structure. Circles
-			// now, so they read as tracks around the centre.
-			float ruling = sin(length(fromCentre) * CELL * RULING_FREQ);
-			float glint = smoothstep(0.55, 1.0, ruling) * 0.08;
+			// The grooves themselves, as grain. Faded out near the middle, where
+			// spokes this fine would only alias.
+			float ruling = sin(theta * RULING_SPOKES);
+			float glint = smoothstep(0.55, 1.0, ruling)
+				* smoothstep(0.0, 0.22, length(fromCentre)) * 0.03;
 
-			// Foil is scored between the cells, so the seams catch first.
-			glint += smoothstep(0.44, 0.5, max(abs(f.x), abs(f.y))) * 0.15;
+			// Foil is scored between the cells, so the seams catch first. Faint:
+			// any stronger and the grid reads as drawn rather than as tooling.
+			glint += smoothstep(0.44, 0.5, max(abs(f.x), abs(f.y))) * 0.07;
 
 			// A touch of the page colour so the band belongs to it, but only a
 			// touch: this finish is closer to a CD than to a prism.
 			vec3 tint = mix(u_acid, vec3(1.0), 0.18);
-			vec3 foil = hue * (0.5 + 0.42 * thrown + 0.32 * sheen);
+			vec3 foil = hue * (0.58 + 0.3 * thrown + 0.28 * sheen);
 			foil = mix(foil, foil * tint * 1.55, 0.1);
 			foil += glint * (0.45 + 0.55 * hue);
 
