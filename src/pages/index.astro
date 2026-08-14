@@ -448,7 +448,7 @@ const socials = [
 
 			// Channel split: a slow-breathing amount at rest, more under the
 			// pointer. Reads as print misregistration rather than a bug.
-			float split = 0.0016 + 0.0006 * sin(u_time * 0.7) + pull * 0.0072;
+			float split = 0.0029 + 0.0011 * sin(u_time * 0.7) + pull * 0.0072;
 			vec3 coverage = vec3(
 				ink(p + vec2(split, 0.0)),
 				ink(p),
