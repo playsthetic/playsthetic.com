@@ -1,13 +1,13 @@
 ---
 /*
- * A rule of holofoil across the foot of the page, cut as the vintage Carddass
- * prism: a checkerboard of diamonds where every cell holds the same ruled
- * grating and only its orientation turns from cell to cell.
+ * A band of holofoil across the foot of the page, cut as the vintage Carddass
+ * prism: a square checkerboard where every cell is spun about its own middle,
+ * so the spectrum converges on that point and neighbours answer the light in
+ * opposite hands.
  *
  * Nothing animates on its own. All of the movement comes from the viewing
- * angle, which is the whole point of foil. Off camera that angle is a slow
- * drift with the pointer layered on. On camera it is where the viewer's head
- * actually is.
+ * angle, which is the whole point of foil. That angle is a slow ping-pong, or
+ * where the viewer's head actually is once they turn the camera on.
  */
 
 interface Props {
@@ -70,7 +70,16 @@ const { note } = Astro.props;
 </footer>
 
 <style>
+	/*
+	 * The lip is how far the canvas runs past the top of the footer, and the
+	 * radius of the page's rounded bottom corners. The two are the same number:
+	 * the foil has to already be there, behind the notch, for the corner to open
+	 * onto anything. Everything in that overhang other than the two notches is
+	 * left transparent, so it covers nothing.
+	 */
 	.foot {
+		--lip: 28px;
+
 		position: fixed;
 		right: 0;
 		bottom: 0;
@@ -83,17 +92,6 @@ const { note } = Astro.props;
 		letter-spacing: 0.14em;
 		line-height: 1.5;
 		text-transform: uppercase;
-	}
-
-	/*
-	 * The canvas runs past the top of the footer by the corner radius. The page
-	 * above is a solid sheet with its bottom corners rounded off, and the foil
-	 * has to already be there, behind the notch, for the corner to open onto
-	 * anything. Everything in that overhang other than the two notches is left
-	 * transparent, so it covers nothing.
-	 */
-	.foot {
-		--lip: 28px;
 	}
 
 	/*
@@ -217,8 +215,8 @@ const { note } = Astro.props;
 
 		const float TAU = 6.28318530718;
 
-		// A diamond across, in CSS pixels rather than in band heights, so the
-		// grain stays put instead of stretching with the viewport.
+		// A cell across, in CSS pixels rather than in band heights, so the grain
+		// stays put instead of stretching with the viewport.
 		const float CELL = 26.0;
 
 		// Turns of the spectrum per turn around a cell's centre. It has to be a
