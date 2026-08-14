@@ -85,12 +85,29 @@ const { note } = Astro.props;
 		text-transform: uppercase;
 	}
 
+	/*
+	 * The canvas runs past the top of the footer by the corner radius. The page
+	 * above is a solid sheet with its bottom corners rounded off, and the foil
+	 * has to already be there, behind the notch, for the corner to open onto
+	 * anything. Everything in that overhang other than the two notches is left
+	 * transparent, so it covers nothing.
+	 */
+	.foot {
+		--lip: 28px;
+	}
+
+	/*
+	 * Height is set outright rather than left to a top/bottom pair. A canvas is
+	 * a replaced element, so with an auto height it sizes itself from its own
+	 * intrinsic ratio and quietly ignores the bottom edge.
+	 */
 	.foil__gl {
 		position: absolute;
-		inset: 0;
+		top: calc(-1 * var(--lip));
+		left: 0;
 		display: block;
 		width: 100%;
-		height: 100%;
+		height: calc(100% + var(--lip));
 	}
 
 	.foot__row {
@@ -193,9 +210,10 @@ const { note } = Astro.props;
 
 		varying vec2 v_uv;
 
-		uniform vec2 u_res;    // strip size in CSS pixels
+		uniform vec2 u_res;    // canvas size in CSS pixels
 		uniform vec2 u_tilt;   // view angle, roughly -1..1 on each axis
 		uniform vec3 u_acid;
+		uniform float u_lip;   // overhang above the footer, and the corner radius
 
 		const float TAU = 6.28318530718;
 
@@ -213,9 +231,9 @@ const { note } = Astro.props;
 		const float SATURATION = 0.34;
 
 		// The eye, in CSS pixels: how far in front of the page it sits, and how
-		// far it travels for a full tilt. Distance is what sets how much the
-		// angle changes from one side of the band to the other, so it is also
-		// what sets how many bands of colour are on screen at once.
+		// far it travels from one side of the window to the other. Their ratio is
+		// the whole swing of the viewing angle, so it decides how much of the
+		// spectrum a visitor can turn up by crossing the page.
 		const float EYE_DIST = 700.0;
 		const float EYE_TRAVEL = 700.0;
 
@@ -234,20 +252,37 @@ const { note } = Astro.props;
 			return 0.5 + 0.5 * cos(TAU * (t + vec3(0.0, 0.33, 0.67)));
 		}
 
-		void main() {
-			// Everything in CSS pixels, measured from the middle of the band.
-			vec2 pos = v_uv * u_res - u_res * 0.5;
+		/*
+		 * How much of this pixel the solid page covers. The canvas overhangs the
+		 * footer by u_lip so that the page's rounded bottom corners have foil to
+		 * open onto; everywhere else in that overhang the page is on top and the
+		 * canvas keeps out of the way by staying transparent.
+		 */
+		float pageCover(vec2 fromTop) {
+			if (u_lip < 0.5 || fromTop.y > u_lip) return 0.0;
 
+			// Distance in from whichever side is nearer, so one arc serves both.
+			float inset = min(fromTop.x, u_res.x - fromTop.x);
+			if (inset >= u_lip) return 1.0;
+
+			// The corner arc is centred level with the top of the overhang.
+			float d = length(vec2(inset, fromTop.y) - vec2(u_lip, 0.0));
+			return 1.0 - smoothstep(u_lip - 1.0, u_lip + 1.0, d);
+		}
+
+		void main() {
 			/*
-			 * A card is not seen from one angle. Every point on it meets the eye
-			 * along a slightly different line, and on a grating a slightly
-			 * different line is a different colour. That variation across a single
-			 * cell is the gradient, so the eye has to be a position and the view a
-			 * per-pixel direction. A single angle for the whole surface makes every
-			 * cell one flat colour, which is not what foil does.
+			 * One viewing direction for the whole band, whether it comes from the
+			 * pointer or from the camera, so every tile answers the same way and
+			 * the strip reads as a single sheet of foil rather than as a row of
+			 * tiles each caught at its own angle.
+			 *
+			 * The variation inside a tile does not come from here. It comes from
+			 * the tile itself: the spun grooves and the struck dome, both of which
+			 * turn the surface far faster across a few pixels than any parallax
+			 * could.
 			 */
-			vec3 eye = vec3(u_tilt * EYE_TRAVEL, EYE_DIST);
-			vec3 toEye = normalize(eye - vec3(pos, 0.0));
+			vec3 toEye = normalize(vec3(u_tilt * EYE_TRAVEL, EYE_DIST));
 
 			// The light stays where it is while the viewer moves. That asymmetry is
 			// what keeps the pattern alive as the angle passes through square.
@@ -316,7 +351,9 @@ const { note } = Astro.props;
 			foil = mix(foil, foil * tint * 1.55, 0.1);
 			foil += glint * (0.45 + 0.55 * hue);
 
-			gl_FragColor = vec4(clamp(foil, 0.0, 1.0), 1.0);
+			// Premultiplied, so the page shows through wherever the sheet covers.
+			float alpha = 1.0 - pageCover(v_uv * u_res);
+			gl_FragColor = vec4(clamp(foil, 0.0, 1.0) * alpha, alpha);
 		}
 	`;
 
@@ -435,8 +472,10 @@ const { note } = Astro.props;
 		const canvas = strip?.querySelector<HTMLCanvasElement>('.foil__gl');
 		if (!strip || !canvas) return;
 
+		// Alpha on: the overhang above the footer has to let the page through
+		// everywhere except the two corner notches.
 		const gl = canvas.getContext('webgl', {
-			alpha: false,
+			alpha: true,
 			antialias: false,
 			depth: false,
 			stencil: false,
@@ -467,10 +506,12 @@ const { note } = Astro.props;
 			res: gl.getUniformLocation(program, 'u_res'),
 			tilt: gl.getUniformLocation(program, 'u_tilt'),
 			acid: gl.getUniformLocation(program, 'u_acid'),
+			lip: gl.getUniformLocation(program, 'u_lip'),
 		};
 
 		const resize = () => {
-			const rect = strip.getBoundingClientRect();
+			// The canvas, not the footer: it stands taller by the overhang.
+			const rect = canvas.getBoundingClientRect();
 			const dpr = Math.min(window.devicePixelRatio || 1, 2);
 			const w = Math.max(1, Math.round(rect.width * dpr));
 			const h = Math.max(1, Math.round(rect.height * dpr));
@@ -482,13 +523,15 @@ const { note } = Astro.props;
 			// CSS pixels, not device pixels: the cell size is a design measure and
 			// should not halve on a retina screen.
 			gl.uniform2f(u.res, rect.width, rect.height);
+			// Read back from CSS so the overhang and the radius cannot drift apart.
+			gl.uniform1f(u.lip, parseFloat(getComputedStyle(strip).getPropertyValue('--lip')) || 0);
 		};
 
 		resize();
 		new ResizeObserver(resize).observe(strip);
 
 		const idle = { x: 0, y: 0 };
-		const pointer = { x: 0, y: 0 };
+		const pointer = { x: 0, y: 0, seen: false };
 		const head = { x: 0, y: 0, live: false };
 
 		// A spring again: head tracking especially is far too jittery to use raw.
@@ -500,8 +543,11 @@ const { note } = Astro.props;
 		window.addEventListener(
 			'pointermove',
 			(e) => {
+				// The full width of the window is the full swing of the angle, as if
+				// the page were a card you turn by walking across it.
 				pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
 				pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
+				pointer.seen = true;
 			},
 			{ passive: true }
 		);
@@ -516,20 +562,23 @@ const { note } = Astro.props;
 			const t = (now - started) / 1000;
 
 			/*
-			 * Two detuned sines per axis: a wander rather than a loop. With no
-			 * camera this is the only thing turning the foil, so it has to be quick
-			 * enough to read as movement on its own. As set, it swings the sweep
-			 * through about a third of the colour wheel, peaking near 70 degrees a
-			 * second. The vertical runs smaller than the horizontal, both because
-			 * heads move that way and because a large vertical swing cancels the
-			 * light and sends the anchor through its blind spot.
+			 * The pointer turns the card: one side of the window to the other is
+			 * the whole swing of the angle. The vertical is kept smaller, partly
+			 * because that is how heads move, but mostly because a large vertical
+			 * swing cancels the light and steers the anchor into the blind spot
+			 * where it has no direction to point.
+			 *
+			 * The drift is now only a fallback, for a visitor who has no pointer to
+			 * move: touch, or a page nobody has touched yet. It stands down for
+			 * good the moment a real one arrives.
 			 */
 			idle.x = Math.sin(t * 0.5) * 0.62 + Math.sin(t * 0.21 + 1.7) * 0.26;
 			idle.y = Math.cos(t * 0.33) * 0.3 + Math.sin(t * 0.13 + 0.6) * 0.13;
 
-			const want = head.live
-				? { x: head.x, y: head.y }
-				: { x: idle.x + pointer.x * 0.45, y: idle.y + pointer.y * 0.3 };
+			let want;
+			if (head.live) want = { x: head.x, y: head.y };
+			else if (pointer.seen) want = { x: pointer.x, y: pointer.y * 0.45 };
+			else want = { x: idle.x, y: idle.y };
 
 			vel.x += (-STIFFNESS * (tilt.x - want.x) - DAMPING * vel.x) * dt;
 			vel.y += (-STIFFNESS * (tilt.y - want.y) - DAMPING * vel.y) * dt;
