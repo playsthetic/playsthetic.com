@@ -403,6 +403,8 @@ const socials = [
 		uniform vec2 u_mouse;
 		uniform vec3 u_bg;
 		uniform float u_time;
+		uniform float u_wake;
+		uniform float u_hover;
 
 		float hash(vec2 p) {
 			return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -432,7 +434,12 @@ const socials = [
 
 			vec2 toMouse = (uv - u_mouse) * vec2(aspect, 1.0);
 			float dist = length(toMouse);
-			float pull = smoothstep(0.6, 0.0, dist);
+
+			// A fast pass reaches further than a slow one. Kept as a 0..1 falloff:
+			// the wake scales the amplitudes below, not this, so the displacement
+			// stays inside the margin the canvas has around the artwork.
+			float reach = 0.6 + 0.32 * u_wake;
+			float pull = smoothstep(reach, 0.0, dist) * u_hover;
 
 			vec2 p = uv;
 
@@ -441,11 +448,22 @@ const socials = [
 			p += (vec2(
 				noise(uv * 2.6 + u_time * 0.46),
 				noise(uv * 2.6 + 41.7 - u_time * 0.39)
-			) - 0.5) * 0.018;
+			) - 0.5) * 0.034;
 
-			// Ripple running out from the pointer.
+			// A faster, tighter wobble riding on the drift so the edges keep
+			// working even when the broad warp is passing through zero.
+			p += (vec2(
+				noise(uv * 6.4 + u_time * 0.95),
+				noise(uv * 6.4 + 73.1 - u_time * 0.83)
+			) - 0.5) * 0.012;
+
+			// Ripple running out from the pointer, deepening with the wake so a
+			// fast pass reads as a bow wave rather than a bulge. Only the
+			// amplitude moves: bending the frequency of a wave already running on
+			// u_time jumps its phase, which is a glitch, not a swell.
 			vec2 dir = toMouse / max(dist, 1e-4);
-			p += dir * sin(dist * 26.0 - u_time * 5.0) * 0.022 * pull;
+			float ripple = sin(dist * 26.0 - u_time * 5.0);
+			p += dir * ripple * (0.022 + 0.03 * u_wake) * pull;
 
 			// A second, much finer melt that only the pointer switches on. Kept
 			// separate from the drift above: scaling one field instead of
@@ -453,11 +471,13 @@ const socials = [
 			p += (vec2(
 				noise(uv * 5.5 + u_time * 0.55),
 				noise(uv * 5.5 + 12.3 - u_time * 0.47)
-			) - 0.5) * 0.1 * pull;
+			) - 0.5) * (0.1 + 0.045 * u_wake) * pull;
 
 			// Channel split: a slow-breathing amount at rest, more under the
 			// pointer. Reads as print misregistration rather than a bug.
-			float split = 0.0029 + 0.0011 * sin(u_time * 0.7) + pull * 0.0072;
+			// Two detuned breaths so the split never settles into an obvious loop.
+			float split = 0.0068 + 0.0022 * sin(u_time * 0.7) + 0.0014 * sin(u_time * 1.63)
+				+ pull * (0.0072 + 0.011 * u_wake);
 			vec3 coverage = vec3(
 				ink(p + vec2(split, 0.0)),
 				ink(p),
@@ -527,6 +547,8 @@ const socials = [
 			mouse: gl.getUniformLocation(program, 'u_mouse'),
 			bg: gl.getUniformLocation(program, 'u_bg'),
 			time: gl.getUniformLocation(program, 'u_time'),
+			wake: gl.getUniformLocation(program, 'u_wake'),
+			hover: gl.getUniformLocation(program, 'u_hover'),
 		};
 
 		const texture = gl.createTexture();
@@ -575,30 +597,84 @@ const socials = [
 		resize();
 		new ResizeObserver(resize).observe(mark);
 
-		// Pointer position in the canvas' own uv space, parked far away when
-		// there is no pointer so only the resting melt is left.
-		let mouse = { x: -9, y: -9 };
+		/*
+		 * The shader never sees the raw pointer. A spring chases it, and the
+		 * shader follows the spring, so the disturbance carries weight: it cannot
+		 * change direction the instant the cursor does, and it keeps coasting
+		 * after the cursor stops. A plain lerp cannot do this. Its velocity jumps
+		 * to maximum the moment the target moves, which is exactly the hard,
+		 * jumpy start the water should not have.
+		 */
+		const STIFFNESS = 40;
+		// Just under critical damping, so a hard stop rolls past by a hair and
+		// settles back. Full critical damping arrives correct but lifeless.
+		const DAMPING = 2 * Math.sqrt(STIFFNESS) * 0.9;
+
+		// Pointer speed, in mark-widths a second, that counts as a full wake.
+		const WAKE_SPEED = 2.6;
+
+		// Pointer position in the canvas' own uv space, plus how present the
+		// pointer is at all. Influence fades rather than teleporting away, so
+		// leaving the window relaxes the water instead of cutting it off.
+		let target = { x: 0.5, y: 0.5 };
+		const eased = { x: 0.5, y: 0.5 };
+		const vel = { x: 0, y: 0 };
+		let hovering = false;
+		let hover = 0;
+		let wake = 0;
 
 		window.addEventListener(
 			'pointermove',
 			(e) => {
 				const rect = mark.getBoundingClientRect();
-				mouse = {
+				target = {
 					x: (e.clientX - rect.left) / rect.width,
 					y: (e.clientY - rect.top) / rect.height,
 				};
+				hovering = true;
+				// Cold start only: put the spring under the pointer at rest rather
+				// than flinging it in from a stale position. Re-entering while the
+				// last disturbance is still fading is left to the spring, which
+				// travels there under its own weight.
+				if (hover < 0.01) {
+					eased.x = target.x;
+					eased.y = target.y;
+					vel.x = 0;
+					vel.y = 0;
+				}
 			},
 			{ passive: true }
 		);
 		document.addEventListener('pointerleave', () => {
-			mouse = { x: -9, y: -9 };
+			hovering = false;
 		});
 
 		const started = performance.now();
+		let last = started;
 
 		const frame = (now: number) => {
+			// Clamped so returning from a background tab is not one huge step.
+			const dt = Math.min((now - last) / 1000, 0.05);
+			last = now;
+
+			// Semi-implicit Euler: velocity first, then position from the new
+			// velocity. Stable at the frame rates the dt clamp allows.
+			vel.x += (-STIFFNESS * (eased.x - target.x) - DAMPING * vel.x) * dt;
+			vel.y += (-STIFFNESS * (eased.y - target.y) - DAMPING * vel.y) * dt;
+			eased.x += vel.x * dt;
+			eased.y += vel.y * dt;
+
+			// Speed comes off the spring, which is already smooth, rather than off
+			// raw pointer deltas. Those arrive in irregular bursts, and reading
+			// them per frame is what made the wake flicker.
+			const speed = Math.min(Math.hypot(vel.x, vel.y) / WAKE_SPEED, 1);
+			wake += (speed - wake) * (1 - Math.exp(-dt * (speed > wake ? 6 : 2.2)));
+			hover += ((hovering ? 1 : 0) - hover) * (1 - Math.exp(-dt * (hovering ? 12 : 3.5)));
+
 			gl.uniform1f(u.time, (now - started) / 1000);
-			gl.uniform2f(u.mouse, mouse.x, mouse.y);
+			gl.uniform1f(u.wake, wake);
+			gl.uniform1f(u.hover, hover);
+			gl.uniform2f(u.mouse, eased.x, eased.y);
 			gl.drawArrays(gl.TRIANGLES, 0, 3);
 			requestAnimationFrame(frame);
 		};
