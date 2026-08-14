@@ -9,8 +9,10 @@
  * they would disagree by a frame and the artwork would sit on a seam.
  */
 
-const BASE_HUE = 67.5; // #d2f000
-const SWING = 9; // degrees either side, so 58.5 (yellow) to 76.5 (green)
+// Centred a few degrees below the brand hue of 67.5 (#d2f000), which biases the
+// whole wander to the yellow side of it.
+const BASE_HUE = 64;
+const SWING = 8; // degrees either side, so 56 (#f0e000) to 72 (#c0f000)
 const SATURATION = 1;
 const LIGHTNESS = 0.47;
 const TAU = Math.PI * 2;

@@ -1,14 +1,13 @@
 ---
 /*
- * A strip of holofoil across the foot of the page. The finishes are the ones
- * collectors name: cosmos, cracked ice, sequin, and so on. Each is a different
- * micro-structure catching the light, so the shader models them the same way a
- * real one works: a field of facets, a view angle, and a spectrum that shifts
- * as the angle changes. Nothing animates on its own. All of the movement comes
- * from the angle, which is the whole point of foil.
+ * A rule of holofoil across the foot of the page, cut as the vintage Carddass
+ * prism: a checkerboard of diamonds where every cell holds the same ruled
+ * grating and only its orientation turns from cell to cell.
  *
- * TEMPORARY: the selector is a scratch control for picking a finish. Every
- * piece of it is marked `SELECTOR` so it can be lifted out in one pass.
+ * Nothing animates on its own. All of the movement comes from the viewing
+ * angle, which is the whole point of foil. Off camera that angle is a slow
+ * drift with the pointer layered on. On camera it is where the viewer's head
+ * actually is.
  */
 
 interface Props {
@@ -16,50 +15,59 @@ interface Props {
 }
 
 const { note } = Astro.props;
-
-const patterns = [
-	{ id: 'diamond', label: 'Diamond checker' },
-	{ id: 'cosmos', label: 'Cosmos' },
-	{ id: 'ice', label: 'Cracked ice' },
-	{ id: 'sequin', label: 'Sequin' },
-	{ id: 'tinsel', label: 'Tinsel' },
-	{ id: 'mirror', label: 'Mirror' },
-	{ id: 'reverse', label: 'Reverse' },
-	{ id: 'etched', label: 'Etched' },
-	{ id: 'refractor', label: 'Refractor' },
-	{ id: 'prizm', label: 'Prizm' },
-];
 ---
 
 <footer class="foot">
-	<div class="foot__strip"><canvas class="foil__gl" aria-hidden="true"></canvas></div>
-	<span class="foot__note" data-scramble="540">{note}</span>
+	<canvas class="foil__gl" aria-hidden="true"></canvas>
+
+	<div class="foot__row">
+		<span class="foot__note" data-scramble="540">{note}</span>
+
+		{/* Glyphs from Lucide 1.31.0 (camera-off, camera), ISC. https://lucide.dev/license */}
+		<button
+			class="foot__tilt"
+			type="button"
+			data-tilt
+			aria-pressed="false"
+			aria-label="Tilt with camera"
+			title="Tilt with camera"
+		>
+			<svg
+				class="foot__icon foot__icon--off"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M14.564 14.558a3 3 0 1 1-4.122-4.121"></path>
+				<path d="m2 2 20 20"></path>
+				<path d="M20 20H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 .819-.175"></path>
+				<path
+					d="M9.695 4.024A2 2 0 0 1 10.004 4h3.993a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v7.344"
+				></path>
+			</svg>
+
+			<svg
+				class="foot__icon foot__icon--on"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path
+					d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"
+				></path>
+				<circle cx="12" cy="13" r="3"></circle>
+			</svg>
+		</button>
+	</div>
 </footer>
-
-{/* SELECTOR ---------------------------------------------------------- */}
-<aside class="picker" aria-label="Foil finish (temporary)">
-	<div class="picker__row picker__row--wrap">
-		{
-			patterns.map((pattern, i) => (
-				<button class="picker__chip" type="button" data-pattern={i}>
-					{pattern.label}
-				</button>
-			))
-		}
-	</div>
-
-	<label class="picker__row">
-		<span class="picker__key">Strength</span>
-		<input class="picker__slider" type="range" min="0" max="100" value="80" data-strength />
-	</label>
-
-	<div class="picker__row">
-		<button class="picker__chip" type="button" data-camera>Head tracking</button>
-		<label class="picker__flip"><input type="checkbox" data-flip checked /> Flip X</label>
-	</div>
-
-	<p class="picker__status" data-status role="status">Pointer and drift</p>
-</aside>
 
 <style>
 	.foot {
@@ -68,18 +76,13 @@ const patterns = [
 		bottom: 0;
 		left: 0;
 		z-index: 2;
+		height: clamp(3.5rem, 9svh, 6rem);
 		display: flex;
-		flex-direction: column;
+		align-items: center;
 		font-size: clamp(0.6rem, 1.5vw, 0.7rem);
 		letter-spacing: 0.14em;
 		line-height: 1.5;
 		text-transform: uppercase;
-	}
-
-	/* A rule, not a panel. The foil reads as an edge caught in the light. */
-	.foot__strip {
-		position: relative;
-		height: clamp(0.5rem, 1.5svh, 0.85rem);
 	}
 
 	.foil__gl {
@@ -90,10 +93,71 @@ const patterns = [
 		height: 100%;
 	}
 
+	.foot__row {
+		position: relative;
+		display: flex;
+		width: 100%;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1.5em;
+		padding-inline: clamp(0.9rem, 2.4vw, 1.6rem);
+	}
+
+	/*
+	 * Knocked out of a black slug rather than set on it. Multiply keeps black
+	 * opaque and lets white through untouched, so the letterforms and the icon
+	 * strokes are holes, and the foil moving behind them is the mark.
+	 */
+	.foot__note,
+	.foot__tilt {
+		background: var(--ink);
+		color: #fff;
+		border-radius: 3px;
+		mix-blend-mode: multiply;
+	}
+
 	.foot__note {
-		padding: clamp(0.7rem, 2svh, 1.1rem) clamp(0.9rem, 2.4vw, 1.6rem);
+		padding: 0.5em 0.7em;
+		/* Knockout type needs the weight: thin strokes leave too little of the
+		   foil showing to read as anything. */
+		font-weight: 700;
 		opacity: 0;
 		animation: foil-fade 0.25s linear 0.64s forwards;
+	}
+
+	/* Same box as the links in the top corner. */
+	.foot__tilt {
+		display: grid;
+		place-items: center;
+		width: var(--icon-box);
+		height: var(--icon-box);
+		padding: 0;
+		border: 0;
+		cursor: pointer;
+		opacity: 0;
+		animation: foil-fade 0.25s linear 0.7s forwards;
+	}
+
+	.foot__icon {
+		grid-area: 1 / 1;
+		display: block;
+		width: var(--icon-glyph);
+		height: auto;
+	}
+
+	/* The glyph reports the state: struck through while the camera is off. */
+	.foot__tilt[aria-pressed='false'] .foot__icon--on,
+	.foot__tilt[aria-pressed='true'] .foot__icon--off {
+		display: none;
+	}
+
+	/* Hover drops the knockout, so the glyph goes solid instead of showing the
+	   foil through it. */
+	.foot__tilt:hover,
+	.foot__tilt:focus-visible {
+		color: var(--acid);
+		mix-blend-mode: normal;
+		outline: none;
 	}
 
 	@keyframes foil-fade {
@@ -103,77 +167,10 @@ const patterns = [
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.foot__note {
+		.foot__note,
+		.foot__tilt {
 			opacity: 1;
 		}
-	}
-
-	/* SELECTOR ---------------------------------------------------------- */
-
-	.picker {
-		position: fixed;
-		right: clamp(0.9rem, 2.4vw, 1.6rem);
-		bottom: calc(clamp(0.5rem, 1.5svh, 0.85rem) + 3.4rem);
-		z-index: 5;
-		width: min(21rem, calc(100vw - 2rem));
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-		padding: 0.6rem;
-		border: 1px solid var(--ink);
-		background: var(--acid);
-		font-size: 0.6rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-
-	.picker__row {
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
-	}
-
-	.picker__row--wrap {
-		flex-wrap: wrap;
-	}
-
-	.picker__chip {
-		padding: 0.25rem 0.4rem;
-		border: 1px solid var(--ink);
-		background: transparent;
-		color: inherit;
-		font: inherit;
-		letter-spacing: inherit;
-		text-transform: inherit;
-		cursor: pointer;
-	}
-
-	.picker__chip[aria-pressed='true'] {
-		background: var(--ink);
-		color: var(--acid);
-	}
-
-	.picker__key {
-		flex: none;
-	}
-
-	.picker__slider {
-		flex: 1;
-		accent-color: var(--ink);
-	}
-
-	.picker__flip {
-		display: flex;
-		align-items: center;
-		gap: 0.2rem;
-		cursor: pointer;
-	}
-
-	.picker__status {
-		margin: 0;
-		opacity: 0.65;
-		text-transform: none;
-		letter-spacing: 0.04em;
 	}
 </style>
 
@@ -191,266 +188,129 @@ const patterns = [
 		}
 	`;
 
-	/*
-	 * Every finish resolves to the same four values, and the composite at the
-	 * bottom is shared. What separates cracked ice from sequin is only the shape
-	 * of the facet field feeding it.
-	 *
-	 *   n      facet slope. The spectrum is indexed by how it meets the view.
-	 *   micro  how much of the surface the structure actually covers.
-	 *   glint  discrete highlights, for finishes made of separate flakes.
-	 *   sharp  how tight the specular is. Higher reads harder and more mirror.
-	 */
 	const FRAG = `
 		precision highp float;
 
 		varying vec2 v_uv;
 
-		uniform vec2  u_res;
-		uniform vec2  u_tilt;      // view angle, roughly -1..1 on each axis
-		uniform float u_pattern;
-		uniform float u_strength;
-		uniform vec4  u_window;    // reverse holo knockout, in uv
-		uniform vec3  u_acid;
+		uniform vec2 u_res;    // strip size in CSS pixels
+		uniform vec2 u_tilt;   // view angle, roughly -1..1 on each axis
+		uniform vec3 u_acid;
 
 		const float TAU = 6.28318530718;
 
-		float hash21(vec2 p) {
-			return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-		}
+		// A diamond across, in CSS pixels rather than in band heights, so the
+		// grain stays put instead of stretching with the viewport.
+		const float CELL = 19.0;
 
-		vec2 hash22(vec2 p) {
-			return fract(sin(vec2(
-				dot(p, vec2(127.1, 311.7)),
-				dot(p, vec2(269.5, 183.3))
-			)) * 43758.5453123);
-		}
+		// How hard the grating splits the spectrum, how tight the sheen runs, and
+		// how far the colour is allowed from white. Prism foil is a mirror with a
+		// rainbow in it, not a rainbow.
+		const float DISPERSION = 2.4;
+		const float SHARPNESS = 3.5;
+		const float SATURATION = 0.34;
 
-		float vnoise(vec2 p) {
-			vec2 i = floor(p);
-			vec2 f = fract(p);
-			f = f * f * (3.0 - 2.0 * f);
-			return mix(
-				mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
-				mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x),
-				f.y
-			);
-		}
+		// The eye, in CSS pixels: how far in front of the page it sits, and how
+		// far it travels for a full tilt. Distance is what sets how much the
+		// angle changes from one side of the band to the other, so it is also
+		// what sets how many bands of colour are on screen at once.
+		const float EYE_DIST = 700.0;
+		const float EYE_TRAVEL = 520.0;
 
-		// Slope of the noise field, which is what a facet normal amounts to here.
-		vec2 nslope(vec2 p, float e) {
-			return vec2(
-				vnoise(p + vec2(e, 0.0)) - vnoise(p - vec2(e, 0.0)),
-				vnoise(p + vec2(0.0, e)) - vnoise(p - vec2(0.0, e))
-			) / (2.0 * e);
-		}
+		// Track spacing, as rings per cell radius. Kept low: at any real density
+		// the tracks alias into moire long before they read as tracks.
+		const float RULING_FREQ = 0.5;
 
-		// Cheap smooth rainbow that wraps cleanly.
+		// How steeply each cell is embossed, as in-plane slope from its middle to
+		// its edge. Parallax alone cannot put a spectrum inside a cell this small:
+		// across nineteen pixels at arm's length the angle barely moves. On a real
+		// card the sweep comes from the cell being a struck dome rather than a flat
+		// patch, so the normal turns across it far faster than the eye does.
+		const float EMBOSS = 0.5;
+
 		vec3 spectrum(float t) {
 			return 0.5 + 0.5 * cos(TAU * (t + vec3(0.0, 0.33, 0.67)));
 		}
 
-		// x: cell id, y: distance to the nearest edge, zw: offset to the centre.
-		vec4 cells(vec2 p) {
-			vec2 base = floor(p);
-			vec2 f = p - base;
-			float best = 8.0;
-			float second = 8.0;
-			float id = 0.0;
-			vec2 off = vec2(0.0);
-			for (int j = -1; j <= 1; j++) {
-				for (int i = -1; i <= 1; i++) {
-					vec2 g = vec2(float(i), float(j));
-					vec2 r = g + hash22(base + g) - f;
-					float d = dot(r, r);
-					if (d < best) {
-						second = best;
-						best = d;
-						id = hash21(base + g);
-						off = r;
-					} else if (d < second) {
-						second = d;
-					}
-				}
-			}
-			return vec4(id, sqrt(second) - sqrt(best), off);
-		}
-
 		void main() {
-			float aspect = u_res.x / max(u_res.y, 1.0);
-			// Pattern scale is in units of band height, so the structure keeps its
-			// size when the band gets wider.
-			vec2 st = vec2(v_uv.x * aspect, v_uv.y);
+			// Everything in CSS pixels, measured from the middle of the band.
+			vec2 pos = v_uv * u_res - u_res * 0.5;
 
-			// The light is fixed and the viewer moves, which is the whole trick.
-			// Without a light offset the response is symmetric about head-on, so
-			// facets cut in opposite directions read identical every time the
-			// angle passes through square and the pattern vanishes.
-			vec2 view = u_tilt + vec2(0.32, -0.58);
+			/*
+			 * A card is not seen from one angle. Every point on it meets the eye
+			 * along a slightly different line, and on a grating a slightly
+			 * different line is a different colour. That variation across a single
+			 * cell is the gradient, so the eye has to be a position and the view a
+			 * per-pixel direction. A single angle for the whole surface makes every
+			 * cell one flat colour, which is not what foil does.
+			 */
+			vec3 eye = vec3(u_tilt * EYE_TRAVEL, EYE_DIST);
+			vec3 toEye = normalize(eye - vec3(pos, 0.0));
 
-			vec2  n = vec2(0.0);
-			float micro = 1.0;
-			float glint = 0.0;
-			float sharp = 6.0;
-			float disp = 1.6;
-			// How far the spectrum is allowed from white. Prism foil is a mirror
-			// with a rainbow in it, not a rainbow.
-			float sat = 1.0;
+			// The light stays where it is while the viewer moves. That asymmetry is
+			// what keeps the pattern alive as the angle passes through square.
+			vec3 toLight = normalize(vec3(-0.28, -0.72, 1.0));
 
-			float pat = u_pattern;
+			// A square checkerboard, square to the page.
+			vec2 q = v_uv * u_res / CELL;
+			vec2 id = floor(q);
+			vec2 f = fract(q) - 0.5;
+			float checker = mod(id.x + id.y, 2.0);
 
-			if (pat < 0.5) {
-				// Diamond checker, the vintage Carddass prism. It is one foil
-				// throughout, not a set of facets tilted against each other: every
-				// cell holds the same ruled grating and only its orientation turns
-				// from cell to cell. Because a grating throws its spectrum across
-				// the rulings, two cells at ninety degrees answer the same viewing
-				// angle with different colours, and turning the card walks each set
-				// through the spectrum at its own rate. That is the whole pattern.
-				//
-				// Sized in CSS pixels rather than band heights: the strip is a rule
-				// now, and grain this fine should not shrink with it.
-				vec2 q = v_uv * u_res / 19.0;
-				vec2 lat = vec2(q.x + q.y, q.x - q.y) * 0.7071;
-				vec2 id = floor(lat);
-				vec2 f = fract(lat) - 0.5;
-				float checker = mod(id.x + id.y, 2.0);
+			/*
+			 * Each square is struck like a tiny CD: the rulings run as concentric
+			 * circles around its middle. A grating throws its spectrum across its
+			 * rulings, and across a circle is radial, so the colour sweeps around
+			 * the centre of every cell rather than running straight over it. That
+			 * polar sweep is what a disc does and what a ruled line cannot.
+			 */
+			vec2 fromCentre = f + vec2(1e-5);
+			vec2 grating = normalize(fromCentre);
 
-				// The two rulings, square to each other.
-				vec2 dir = checker < 0.5 ? vec2(0.94, 0.34) : vec2(0.34, -0.94);
-				n = dir * 1.7;
+			// Struck one way here and the other way next door. With every cell now
+			// ruled alike, the alternating bow is what keeps the checkerboard.
+			float bow = checker < 0.5 ? 1.0 : -1.0;
 
-				// The rulings themselves, as grain rather than as structure.
-				vec2 across = vec2(-dir.y, dir.x);
-				float ruling = sin(dot(v_uv * u_res, across) * 1.15);
-				glint = smoothstep(0.55, 1.0, ruling) * 0.22;
+			// The cell is a dome, so the normal turns from its middle out to its
+			// edges, and flips back hard at the seam into the next one.
+			vec3 normal = normalize(vec3(-fromCentre * EMBOSS * bow, 1.0));
 
-				// Foil is scored between the cells, so the seams catch first.
-				glint += smoothstep(0.44, 0.5, max(abs(f.x), abs(f.y))) * 0.28;
+			// The grating direction, laid onto the tilted face.
+			vec3 flat3 = vec3(grating, 0.0);
+			vec3 ruled = normalize(flat3 - normal * dot(flat3, normal));
 
-				// Neutral: silver first, spectrum second. This is a CD, not a prism.
-				sat = 0.42;
-				sharp = 3.2;
-				disp = 2.4;
-			} else if (pat < 1.5) {
-				// Cosmos. A broad nebula slope carrying a dense field of flakes,
-				// each of which only lights up when the view lines up with the
-				// angle it happens to sit at. That is the twinkle.
-				n = nslope(st * 2.4, 0.02) * 0.5;
+			// First-order grating equation, near enough: the wavelength sent to the
+			// eye follows the angles of the light and the eye measured across the
+			// rulings. Both are per-pixel, so the spectrum sweeps across the cell.
+			float phase = (dot(toEye, ruled) + dot(toLight, ruled)) * DISPERSION;
+			vec3 hue = mix(vec3(1.0), spectrum(phase), SATURATION);
 
-				vec2 g = st * 40.0;
-				vec2 id = floor(g);
-				vec2 f = fract(g) - 0.5;
-				vec2 jitter = hash22(id) - 0.5;
-				float d = length(f - jitter * 0.8);
-				float flake = smoothstep(0.34, 0.02, d);
-				vec2 own = (hash22(id + 5.1) - 0.5) * 2.2;
-				float align = exp(-dot(view - own, view - own) * 5.0);
-				glint = flake * align * 1.5;
-				micro = 0.85;
-				disp = 2.2;
-			} else if (pat < 2.5) {
-				// Cracked ice. Shards with flat interiors, so the colour holds
-				// across a whole piece and snaps at the fracture lines.
-				vec4 c = cells(st * 7.0);
-				n = (hash22(vec2(c.x, c.x + 1.0)) - 0.5) * 2.4;
-				float seam = smoothstep(0.06, 0.0, c.y);
-				glint = seam * 0.8;
-				sharp = 3.0;
-				disp = 1.3;
-			} else if (pat < 3.5) {
-				// Sequin. Discs on a staggered grid, each domed, so every one runs
-				// the full spectrum from its own edge to its centre.
-				vec2 g = st * 13.0;
-				float row = floor(g.y);
-				g.x += mod(row, 2.0) * 0.5;
-				vec2 f = fract(g) - 0.5;
-				float r = length(f) / 0.42;
-				float disc = smoothstep(1.0, 0.9, r);
-				n = f / 0.42 * 1.7;
-				micro = disc;
-				glint = disc * smoothstep(0.55, 0.0, length(f / 0.42 - view * 0.55)) * 0.9;
-				sharp = 5.0;
-				disp = 1.8;
-			} else if (pat < 4.5) {
-				// Tinsel. Fine vertical strands: all of the play is horizontal,
-				// which is why tinsel cards look dead when you tilt them the wrong
-				// way and come alive across.
-				float strands = st.x * 190.0;
-				n = vec2(sin(strands) * 1.9, 0.06);
-				micro = 0.95;
-				sharp = 9.0;
-				disp = 2.6;
-			} else if (pat < 5.5) {
-				// Mirror. No micro-structure at all, one broad sweep. The plainest
-				// finish and the one that shows the tilt most honestly.
-				n = (v_uv - 0.5) * vec2(1.4, 2.2);
-				sharp = 2.2;
-				disp = 1.0;
-			} else if (pat < 6.5) {
-				// Reverse holo. Foil across everything except the art window, which
-				// here is the type. Knocked out with a soft edge so it reads as a
-				// masked print rather than a hole.
-				n = nslope(st * 2.0, 0.02) * 0.45;
+			// How much of the light this cell throws at the eye at all. Cells ruled
+			// across the light-to-eye direction send the most, which is why the
+			// checkerboard alternates in brightness and not only in colour.
+			vec2 half2 = toEye.xy + toLight.xy;
+			float thrown = abs(dot(normalize(half2 + vec2(1e-5)), grating));
 
-				vec2 g = st * 34.0;
-				vec2 id = floor(g);
-				vec2 f = fract(g) - 0.5;
-				float d = length(f - (hash22(id) - 0.5) * 0.7);
-				glint = smoothstep(0.3, 0.02, d) * 0.5;
+			// Sheen around the mirror direction, off the embossed normal.
+			vec3 mirror = reflect(-toLight, normal);
+			float sheen = pow(max(dot(mirror, toEye), 0.0), SHARPNESS);
 
-				vec2 inside = smoothstep(u_window.xy - 0.02, u_window.xy + 0.02, v_uv)
-					* (1.0 - smoothstep(u_window.zw - 0.02, u_window.zw + 0.02, v_uv));
-				micro = 1.0 - inside.x * inside.y;
-				disp = 2.0;
-			} else if (pat < 7.5) {
-				// Etched. Raised ridges you would feel with a thumb, so this one
-				// leans on the specular and keeps the rainbow down.
-				float ridge = sin(st.x * 26.0 + sin(st.y * 9.0) * 2.0);
-				float bevel = cos(st.x * 26.0 + sin(st.y * 9.0) * 2.0);
-				n = vec2(bevel * 1.4, sign(ridge) * 0.35);
-				glint = pow(clamp(1.0 - abs(ridge - view.x * 0.6), 0.0, 1.0), 14.0) * 1.1;
-				sharp = 12.0;
-				disp = 0.55;
-			} else if (pat < 8.5) {
-				// Refractor. A diffraction grating: fine diagonal rulings that
-				// split the spectrum hard and sweep it fast.
-				float grating = dot(st, normalize(vec2(0.55, 1.0))) * 150.0;
-				n = vec2(sin(grating) * 1.2, cos(grating) * 1.2);
-				micro = 1.0;
-				sharp = 7.0;
-				disp = 3.4;
-			} else {
-				// Prizm. Big triangular facets, each a flat plane, so the band
-				// breaks into slabs of colour that flip over as a group.
-				vec2 g = st * 5.5;
-				vec2 id = floor(g);
-				vec2 f = fract(g);
-				float upper = step(1.0, f.x + f.y);
-				vec2 seed = id + upper * 31.7;
-				n = (hash22(seed) - 0.5) * 2.6;
-				float edge = abs(f.x + f.y - 1.0);
-				glint = smoothstep(0.05, 0.0, edge) * 0.5;
-				sharp = 3.5;
-				disp = 1.2;
-			}
+			// The rulings themselves, as grain rather than as structure. Circles
+			// now, so they read as tracks around the centre.
+			float ruling = sin(length(fromCentre) * CELL * RULING_FREQ);
+			float glint = smoothstep(0.55, 1.0, ruling) * 0.08;
 
-			// Shared response. The spectrum is indexed by how the facet meets the
-			// view, and the specular peaks where the facet points straight at it.
-			vec3 hue = spectrum(dot(n, view) * disp + 0.5);
-			float spec = pow(clamp(1.0 - 0.75 * length(n - view), 0.0, 1.0), sharp);
+			// Foil is scored between the cells, so the seams catch first.
+			glint += smoothstep(0.44, 0.5, max(abs(f.x), abs(f.y))) * 0.15;
 
-			// The spectrum leads and the specular rides on top. Mixing the two
-			// halfway, which is the obvious way to write this, greys out every
-			// facet that is not directly catching the light, and grey is the one
-			// thing foil never looks like.
+			// A touch of the page colour so the band belongs to it, but only a
+			// touch: this finish is closer to a CD than to a prism.
 			vec3 tint = mix(u_acid, vec3(1.0), 0.18);
-			vec3 foil = hue * (0.62 + 0.8 * spec);
-			foil = mix(foil, foil * tint * 1.55, 0.3);
+			vec3 foil = hue * (0.5 + 0.42 * thrown + 0.32 * sheen);
+			foil = mix(foil, foil * tint * 1.55, 0.1);
 			foil += glint * (0.45 + 0.55 * hue);
 
-			vec3 col = mix(u_acid, foil, clamp(u_strength * micro, 0.0, 1.0));
-			gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+			gl_FragColor = vec4(clamp(foil, 0.0, 1.0), 1.0);
 		}
 	`;
 
@@ -470,8 +330,9 @@ const patterns = [
 	/* Head tracking ---------------------------------------------------- */
 
 	/*
-	 * Where the viewer's head is, as an offset from centre. Everything stays in
-	 * the page: the frames go to a 64x48 scratch canvas and nowhere else.
+	 * Where the viewer's head is, as an offset from centre. Nothing leaves the
+	 * page: frames go to a 64x48 scratch canvas and nowhere else, and the camera
+	 * is only ever touched after a click.
 	 *
 	 * FaceDetector does the job properly where it exists, which today is
 	 * essentially Chrome with the flag on. The fallback is a skin-tone centroid,
@@ -479,6 +340,10 @@ const patterns = [
 	 * drive a reflection and costs nothing to ship.
 	 */
 	type Head = { x: number; y: number; found: boolean };
+
+	// A front camera hands over an unmirrored frame, so leaning right moves the
+	// head left in it. Flip so the reflection follows the way you actually lean.
+	const FLIP_X = -1;
 
 	function createTracker() {
 		const video = document.createElement('video');
@@ -525,8 +390,7 @@ const patterns = [
 				const max = Math.max(r, g, b);
 				const min = Math.min(r, g, b);
 				// The usual skin-tone box: warm, not grey, red ahead of the rest.
-				const skin =
-					r > 80 && g > 30 && b > 15 && max - min > 12 && r - g > 12 && r > b;
+				const skin = r > 80 && g > 30 && b > 15 && max - min > 12 && r - g > 12 && r > b;
 				if (!skin) continue;
 				sx += px % scratch.width;
 				sy += (px / scratch.width) | 0;
@@ -547,7 +411,6 @@ const patterns = [
 			});
 			video.srcObject = stream;
 			await video.play();
-			return detector ? 'FaceDetector' : 'skin-tone centroid';
 		};
 
 		const stop = () => {
@@ -559,13 +422,12 @@ const patterns = [
 		return { start, stop, read };
 	}
 
-	/* Band ------------------------------------------------------------- */
+	/* Strip ------------------------------------------------------------ */
 
-	function renderBand() {
-		const band = document.querySelector<HTMLElement>('.foil');
-		const canvas = band?.querySelector<HTMLCanvasElement>('.foil__gl');
-		const note = band?.querySelector<HTMLElement>('.foil__note');
-		if (!band || !canvas || !note) return;
+	function renderStrip() {
+		const strip = document.querySelector<HTMLElement>('.foot');
+		const canvas = strip?.querySelector<HTMLCanvasElement>('.foil__gl');
+		if (!strip || !canvas) return;
 
 		const gl = canvas.getContext('webgl', {
 			alpha: false,
@@ -598,50 +460,32 @@ const patterns = [
 		const u = {
 			res: gl.getUniformLocation(program, 'u_res'),
 			tilt: gl.getUniformLocation(program, 'u_tilt'),
-			pattern: gl.getUniformLocation(program, 'u_pattern'),
-			strength: gl.getUniformLocation(program, 'u_strength'),
-			window: gl.getUniformLocation(program, 'u_window'),
 			acid: gl.getUniformLocation(program, 'u_acid'),
 		};
 
-		const state = { pattern: 0, strength: 0.8, flip: true };
-
 		const resize = () => {
-			const rect = band.getBoundingClientRect();
+			const rect = strip.getBoundingClientRect();
 			const dpr = Math.min(window.devicePixelRatio || 1, 2);
 			const w = Math.max(1, Math.round(rect.width * dpr));
 			const h = Math.max(1, Math.round(rect.height * dpr));
-			if (canvas.width !== w || canvas.height !== h) {
-				canvas.width = w;
-				canvas.height = h;
-				gl.viewport(0, 0, w, h);
-				gl.uniform2f(u.res, w, h);
-			}
+			if (canvas.width === w && canvas.height === h) return;
 
-			// Where the type sits, for the reverse holo knockout.
-			const box = note.getBoundingClientRect();
-			gl.uniform4f(
-				u.window,
-				(box.left - rect.left) / rect.width - 0.02,
-				(box.top - rect.top) / rect.height - 0.12,
-				(box.right - rect.left) / rect.width + 0.02,
-				(box.bottom - rect.top) / rect.height + 0.12
-			);
+			canvas.width = w;
+			canvas.height = h;
+			gl.viewport(0, 0, w, h);
+			// CSS pixels, not device pixels: the cell size is a design measure and
+			// should not halve on a retina screen.
+			gl.uniform2f(u.res, rect.width, rect.height);
 		};
 
 		resize();
-		new ResizeObserver(resize).observe(band);
+		new ResizeObserver(resize).observe(strip);
 
-		/*
-		 * View angle. Off camera it is a slow drift with the pointer layered on
-		 * top, which is the closest a mouse gets to turning a card in your hand.
-		 * On camera it is where the viewer's head actually is.
-		 */
 		const idle = { x: 0, y: 0 };
 		const pointer = { x: 0, y: 0 };
 		const head = { x: 0, y: 0, live: false };
 
-		// Springs again: head tracking especially is far too jittery to use raw.
+		// A spring again: head tracking especially is far too jittery to use raw.
 		const STIFFNESS = 18;
 		const DAMPING = 2 * Math.sqrt(18) * 0.85;
 		const tilt = { x: 0, y: 0 };
@@ -679,9 +523,7 @@ const patterns = [
 			tilt.y += vel.y * dt;
 
 			gl.uniform2f(u.tilt, tilt.x, tilt.y);
-			gl.uniform1f(u.pattern, state.pattern);
-			gl.uniform1f(u.strength, state.strength);
-			// The band sits flush against the page, so it tracks the drifting
+			// The strip sits flush against the page, so it tracks the drifting
 			// background rather than a colour sampled once at startup.
 			gl.uniform3fv(u.acid, acid());
 			gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -691,61 +533,43 @@ const patterns = [
 
 		requestAnimationFrame(frame);
 
-		/* SELECTOR ------------------------------------------------------ */
+		/* Camera opt-in --------------------------------------------------- */
 
-		const picker = document.querySelector<HTMLElement>('.picker');
-		const status = picker?.querySelector<HTMLElement>('[data-status]');
-		const chips = picker?.querySelectorAll<HTMLButtonElement>('[data-pattern]');
-		const say = (text: string) => {
-			if (status) status.textContent = text;
-		};
-
-		chips?.forEach((chip) => {
-			chip.setAttribute('aria-pressed', String(Number(chip.dataset.pattern) === 0));
-			chip.addEventListener('click', () => {
-				state.pattern = Number(chip.dataset.pattern);
-				chips.forEach((other) => other.setAttribute('aria-pressed', String(other === chip)));
-				if (still && !head.live) requestAnimationFrame(frame);
-			});
-		});
-
-		picker?.querySelector<HTMLInputElement>('[data-strength]')?.addEventListener('input', (e) => {
-			state.strength = Number((e.target as HTMLInputElement).value) / 100;
-			if (still && !head.live) requestAnimationFrame(frame);
-		});
-
-		const flip = picker?.querySelector<HTMLInputElement>('[data-flip]');
-		flip?.addEventListener('change', () => {
-			state.flip = flip.checked;
-		});
-
-		const camera = picker?.querySelector<HTMLButtonElement>('[data-camera]');
+		const button = document.querySelector<HTMLButtonElement>('[data-tilt]');
 		let tracker: ReturnType<typeof createTracker> | null = null;
 
-		camera?.addEventListener('click', async () => {
+		// The control is a glyph, so its state has to live in the label rather
+		// than in what it says.
+		const label = (text: string) => {
+			button?.setAttribute('aria-label', text);
+			button?.setAttribute('title', text);
+		};
+
+		button?.addEventListener('click', async () => {
 			if (head.live) {
 				tracker?.stop();
 				tracker = null;
 				head.live = false;
-				camera.setAttribute('aria-pressed', 'false');
-				say('Pointer and drift');
+				head.x = 0;
+				head.y = 0;
+				button.setAttribute('aria-pressed', 'false');
+				label('Tilt with camera');
 				return;
 			}
 
-			say('Asking for the camera…');
+			label('Asking for the camera');
 			tracker = createTracker();
-			let how: string;
 			try {
-				how = await tracker.start();
+				await tracker.start();
 			} catch (err) {
 				tracker = null;
-				say(`Camera refused: ${(err as Error).name}`);
+				label(`Camera ${(err as Error).name === 'NotAllowedError' ? 'refused' : 'failed'}`);
 				return;
 			}
 
 			head.live = true;
-			camera.setAttribute('aria-pressed', 'true');
-			say(`Tracking via ${how}`);
+			button.setAttribute('aria-pressed', 'true');
+			label('Tilting with camera');
 			if (still) requestAnimationFrame(frame);
 
 			// Reading every frame is wasted work: a head does not move that fast,
@@ -756,13 +580,12 @@ const patterns = [
 				const found = await tracker.read();
 				if (found.found) {
 					misses = 0;
-					// Doubled because a head crosses only a fraction of the frame.
-					const sign = state.flip ? -1 : 1;
-					head.x = Math.max(-1, Math.min(1, found.x * 2.6 * sign));
+					// Scaled up because a head crosses only a fraction of the frame.
+					head.x = Math.max(-1, Math.min(1, found.x * 2.6 * FLIP_X));
 					head.y = Math.max(-1, Math.min(1, found.y * 2.6));
-					say(`Tracking via ${how}`);
+					label('Tilting with camera');
 				} else if (++misses === 8) {
-					say(`No head found. ${how}, so try more light.`);
+					label('No head found');
 				}
 				setTimeout(poll, 90);
 			};
@@ -771,5 +594,5 @@ const patterns = [
 	}
 
 	driftAcid();
-	renderBand();
+	renderStrip();
 </script>
