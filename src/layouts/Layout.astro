@@ -22,7 +22,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 		{canonical && <link rel="canonical" href={canonical} />}
 
 		<link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
-		{/* Restated by the backdrop module as the gradient pans. */}
+		{/* Restated by the backdrop module as the hue wanders. */}
 		<meta name="theme-color" content="#e8f000" />
 
 		<meta property="og:type" content="website" />
@@ -43,16 +43,9 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 	:root {
 		color-scheme: only light;
 
-		/* The flat acid, for type and icons. The page itself uses the gradient
-		   below, whose two ends sit either side of this. */
+		/* Restated by the backdrop module as the hue wanders. */
 		--acid: #cbf000;
 		--ink: #000000;
-
-		/* Replaced by the backdrop module once it starts. Declared here so the
-		   first paint is a plain acid page rather than a flash of nothing. */
-		--bg-image: none;
-		--bg-wave: 2000px;
-		--bg-shift: 0 0;
 
 		--mono:
 			ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
@@ -78,22 +71,9 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 		height: 100%;
 	}
 
-	/*
-	 * The gradient is built in the backdrop module: its stops are samples off a
-	 * cosine, and both this and the shaders have to read the same curve. The tile
-	 * is exactly one wavelength tall and repeats, so panning it is a
-	 * background-position and nothing has to be rasterised again. Fixed, so the
-	 * positioning area is the viewport, which is the frame the shaders measure
-	 * against.
-	 */
 	body {
 		margin: 0;
-		background-color: var(--acid);
-		background-image: var(--bg-image);
-		background-size: 100% var(--bg-wave);
-		background-repeat: repeat;
-		background-attachment: fixed;
-		background-position: var(--bg-shift);
+		background: var(--acid);
 		color: var(--ink);
 		font-family: var(--mono);
 		font-synthesis-weight: none;

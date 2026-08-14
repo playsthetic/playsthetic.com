@@ -76,7 +76,7 @@ const { note } = Astro.props;
 		bottom: 0;
 		left: 0;
 		z-index: 2;
-		height: clamp(3.5rem, 9svh, 6rem);
+		height: clamp(3rem, 7.5svh, 5rem);
 		display: flex;
 		align-items: center;
 		font-size: clamp(0.6rem, 1.5vw, 0.7rem);
@@ -192,7 +192,7 @@ const { note } = Astro.props;
 </style>
 
 <script>
-	import { backdropAt, driftAcid } from '../scripts/acid';
+	import { acid, driftAcid } from '../scripts/acid';
 
 	/* Shader ----------------------------------------------------------- */
 
@@ -522,17 +522,9 @@ const { note } = Astro.props;
 			lip: gl.getUniformLocation(program, 'u_lip'),
 		};
 
-		// Where the band sits, for sampling the page gradient. Cached rather than
-		// measured per frame: reading layout every frame to place a tenth of a
-		// tint is not worth the reflow.
-		const centre = { x: 0, y: 0 };
-
 		const resize = () => {
 			// The canvas, not the footer: it stands taller by the overhang.
 			const rect = canvas.getBoundingClientRect();
-			centre.x = rect.left + rect.width / 2;
-			centre.y = rect.top + rect.height / 2;
-
 			const dpr = Math.min(window.devicePixelRatio || 1, 2);
 			const w = Math.max(1, Math.round(rect.width * dpr));
 			const h = Math.max(1, Math.round(rect.height * dpr));
@@ -611,10 +603,9 @@ const { note } = Astro.props;
 			tilt.y += (want.y - tilt.y) * follow;
 
 			gl.uniform2f(u.tilt, tilt.x, tilt.y);
-			// One sample at the band's middle is enough here: the tint is a tenth
-			// of the mix, and unlike the mark the foil is its own material rather
-			// than a hole cut in the page, so there is no edge to match.
-			gl.uniform3fv(u.acid, backdropAt(centre.x, centre.y));
+			// The band sits flush against the page, so it tracks the drifting
+			// colour rather than one sampled once at startup.
+			gl.uniform3fv(u.acid, acid());
 			gl.drawArrays(gl.TRIANGLES, 0, 3);
 
 			if (!still || head.live) requestAnimationFrame(frame);

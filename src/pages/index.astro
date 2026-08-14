@@ -325,7 +325,7 @@ const socials = [
 </style>
 
 <script>
-	import { backdrop, driftAcid } from '../scripts/acid';
+	import { acid, driftAcid } from '../scripts/acid';
 
 	/*
 	 * Two effects, both optional. The mark renders through a fragment shader
@@ -397,16 +397,7 @@ const socials = [
 		uniform vec2 u_mouse;
 		uniform float u_time;
 
-		// The page gradient, evaluated here rather than handed over as one colour.
-		// The mark is a hole cut in the page, so a single averaged colour would
-		// show up as a rectangle around the artwork the moment the page moved.
-		uniform vec3 u_bgA;
-		uniform vec3 u_bgB;
-		uniform vec2 u_bgDir;
-		uniform float u_bgWave;
-		uniform float u_bgPhase;
-		uniform vec2 u_origin;  // canvas top-left in viewport CSS pixels
-		uniform vec2 u_size;    // canvas size in CSS pixels
+		uniform vec3 u_bg;
 		uniform float u_wake;
 		uniform float u_hover;
 
@@ -423,14 +414,6 @@ const socials = [
 				mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
 				f.y
 			);
-		}
-
-		// The same cosine the CSS gradient samples its stops from. A triangle here
-		// would be simpler, and is what three stops give you, but its slope turns
-		// a corner at each end and that corner draws a crease across the page.
-		vec3 backdrop(vec2 viewportPx) {
-			float t = fract(dot(viewportPx, u_bgDir) / u_bgWave - u_bgPhase);
-			return mix(u_bgA, u_bgB, 0.5 - 0.5 * cos(6.28318530718 * t));
 		}
 
 		// Ink coverage, clamped so displaced samples cannot smear off the edges.
@@ -485,18 +468,52 @@ const socials = [
 				noise(uv * 5.5 + 12.3 - u_time * 0.47)
 			) - 0.5) * (0.1 + 0.045 * u_wake) * pull;
 
-			// Channel split: a slow-breathing amount at rest, more under the
-			// pointer. Reads as print misregistration rather than a bug.
-			// Two detuned breaths so the split never settles into an obvious loop.
+			// How far the plates have drifted apart. A slow-breathing amount at
+			// rest, more under the pointer, on two detuned breaths so it never
+			// settles into an obvious loop.
 			float split = 0.0068 + 0.0022 * sin(u_time * 0.7) + 0.0014 * sin(u_time * 1.63)
 				+ pull * (0.0072 + 0.011 * u_wake);
-			vec3 coverage = vec3(
-				ink(p + vec2(split, 0.0)),
-				ink(p),
-				ink(p - vec2(split, 0.0))
-			);
 
-			gl_FragColor = vec4(backdrop(u_origin + v_uv * u_size) * (1.0 - coverage), 1.0);
+			/*
+			 * Four plates out of register rather than three channels pulled apart.
+			 *
+			 * A lens splits light, so an RGB aberration adds: three separate reads,
+			 * one per channel. A press splits the image, and ink subtracts: each
+			 * plate takes its own part of the spectrum out of whatever is behind it,
+			 * so the four multiply together. That is why this is a product and not
+			 * three lookups, and why the fringes come out cyan, magenta and yellow
+			 * instead of red and green.
+			 *
+			 * The plates sit at the angles a printer would screen them at, and black
+			 * holds still: it is the key plate, the one the others are registered
+			 * against, so the silhouette stays sharp and only the colour creeps out
+			 * from under its edge.
+			 */
+			vec2 aspectFix = vec2(1.0, aspect);
+			float cyan = ink(p + vec2(0.966, 0.259) * split * aspectFix);
+			float magenta = ink(p + vec2(0.259, -0.966) * split * aspectFix);
+			float yellow = ink(p - vec2(0.966, 0.259) * split * aspectFix);
+			float key = ink(p);
+
+			/*
+			 * The plates lay ink down rather than filter what is behind them.
+			 *
+			 * Filtering is the truer model of ink on white, and on this page it does
+			 * nothing: acid has no blue in it, so the yellow plate has nothing to
+			 * subtract and disappears, while cyan and magenta come through as plain
+			 * green and red. Printing each plate in its own colour is what makes a
+			 * misregistered edge read as cyan, magenta and yellow on any stock.
+			 *
+			 * Laid down in press order, black last, so the silhouette stays solid
+			 * and the colour only shows where a plate has crept out from under it.
+			 */
+			vec3 sheet = u_bg;
+			sheet = mix(sheet, vec3(1.0, 0.94, 0.0), yellow);
+			sheet = mix(sheet, vec3(0.93, 0.0, 0.55), magenta);
+			sheet = mix(sheet, vec3(0.0, 0.67, 0.93), cyan);
+			sheet = mix(sheet, vec3(0.0), key);
+
+			gl_FragColor = vec4(sheet, 1.0);
 		}
 	`;
 
@@ -552,13 +569,7 @@ const socials = [
 			res: gl.getUniformLocation(program, 'u_res'),
 			mouse: gl.getUniformLocation(program, 'u_mouse'),
 			time: gl.getUniformLocation(program, 'u_time'),
-			bgA: gl.getUniformLocation(program, 'u_bgA'),
-			bgB: gl.getUniformLocation(program, 'u_bgB'),
-			bgDir: gl.getUniformLocation(program, 'u_bgDir'),
-			bgWave: gl.getUniformLocation(program, 'u_bgWave'),
-			bgPhase: gl.getUniformLocation(program, 'u_bgPhase'),
-			origin: gl.getUniformLocation(program, 'u_origin'),
-			size: gl.getUniformLocation(program, 'u_size'),
+			bg: gl.getUniformLocation(program, 'u_bg'),
 			wake: gl.getUniformLocation(program, 'u_wake'),
 			hover: gl.getUniformLocation(program, 'u_hover'),
 		};
@@ -570,11 +581,6 @@ const socials = [
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.uniform1i(u.tex, 0);
-		// The gradient's ends and axis never change; only its phase does.
-		gl.uniform3fv(u.bgA, backdrop.a);
-		gl.uniform3fv(u.bgB, backdrop.b);
-		gl.uniform2fv(u.bgDir, backdrop.dir);
-		gl.uniform1f(u.bgWave, backdrop.wavelength);
 
 		// Matches the 83.333% inset the fallback <img> uses.
 		const INSET = 0.8333;
@@ -592,14 +598,6 @@ const socials = [
 
 		const resize = () => {
 			const rect = mark.getBoundingClientRect();
-
-			// Where the mark sits in the viewport, so the shader can look up the
-			// page gradient at the right place. Set before the early return: the
-			// window can change shape while the mark, being clamped, does not, and
-			// the artwork would then be reading the gradient from its old position.
-			gl.uniform2f(u.origin, rect.left, rect.top);
-			gl.uniform2f(u.size, rect.width, rect.height);
-
 			const dpr = Math.min(window.devicePixelRatio || 1, 2);
 			const w = Math.max(1, Math.round(rect.width * dpr));
 			const h = Math.max(1, Math.round(rect.height * dpr));
@@ -620,7 +618,6 @@ const socials = [
 
 		resize();
 		new ResizeObserver(resize).observe(mark);
-		window.addEventListener('resize', resize, { passive: true });
 
 		/*
 		 * The shader never sees the raw pointer. A spring chases it, and the
@@ -733,9 +730,9 @@ const socials = [
 			gl.uniform1f(u.wake, wake);
 			gl.uniform1f(u.hover, hover);
 			gl.uniform2f(u.mouse, eased.x, eased.y);
-			// Re-read every frame: the page gradient pans, and the mark is cut out
-			// of it, so a stale phase would show up as a seam around the artwork.
-			gl.uniform1f(u.bgPhase, backdrop.phase());
+			// Re-read every frame: the page colour drifts, and the mark is cut out
+			// of it, so a stale value would show up as a seam around the artwork.
+			gl.uniform3fv(u.bg, acid());
 			gl.drawArrays(gl.TRIANGLES, 0, 3);
 			requestAnimationFrame(frame);
 		};
