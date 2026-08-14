@@ -430,9 +430,9 @@ const socials = [
 			// Broad drift that never stops. Deliberately low frequency: it warps
 			// the silhouette as a whole rather than chewing at its edges.
 			p += (vec2(
-				noise(uv * 2.6 + u_time * 0.28),
-				noise(uv * 2.6 + 41.7 - u_time * 0.24)
-			) - 0.5) * 0.013;
+				noise(uv * 2.6 + u_time * 0.46),
+				noise(uv * 2.6 + 41.7 - u_time * 0.39)
+			) - 0.5) * 0.018;
 
 			// Ripple running out from the pointer.
 			vec2 dir = toMouse / max(dist, 1e-4);
