@@ -87,7 +87,10 @@ const socials = [
 	.hud {
 		position: fixed;
 		inset: clamp(0.9rem, 2.4vw, 1.6rem);
-		z-index: 3;
+		/* Under the status bar and the Dynamic Island otherwise, now that the page
+		   is laid out over them rather than inside them. */
+		padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+		z-index: 4;
 		display: flex;
 		flex-direction: column;
 		justify-content: space-between;
@@ -172,14 +175,22 @@ const socials = [
 	/* Stage ------------------------------------------------------------ */
 
 	/* Bottom padding runs heavier than the top so the block sits above centre. */
+	/*
+	 * The page proper. It carries the solid colour and the rounded bottom corners
+	 * that open onto the foil below, which the overlay used to do, and it takes
+	 * whatever height is left once the footer has had its share.
+	 */
 	.stage {
 		position: relative;
 		z-index: 1;
+		flex: 1;
+		border-bottom-left-radius: 28px;
+		border-bottom-right-radius: 28px;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		min-height: 100svh;
+		background: var(--acid);
 		padding: clamp(3rem, 7svh, 4.5rem) clamp(1.5rem, 5vw, 3rem) clamp(4rem, 16svh, 9rem);
 		text-align: center;
 	}
@@ -242,6 +253,7 @@ const socials = [
 	/* The only line of copy on the page now that the artwork carries the name. */
 	.tagline {
 		margin: clamp(1.6rem, 4.2svh, 2.8rem) 0 0;
+		font-weight: 700;
 		max-width: 46ch;
 		font-size: clamp(0.68rem, 1.8vw, 0.82rem);
 		letter-spacing: 0.2em;
@@ -256,7 +268,7 @@ const socials = [
 	.grain {
 		position: fixed;
 		inset: 0;
-		z-index: 4;
+		z-index: 5;
 		pointer-events: none;
 		opacity: 0.12;
 		mix-blend-mode: multiply;

@@ -14,7 +14,15 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		{/*
+		  viewport-fit=cover, or the page stops short of the screen on a phone with
+		  a home indicator: iOS lays the page out inside the safe area and fills the
+		  strip below it with the document's own background colour. The footer then
+		  looks cut off, with a band of flat colour under it where the foil should
+		  have carried on to the edge. Cover hands us that strip, and the safe-area
+		  insets below say where it is.
+		*/}
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<meta name="generator" content={Astro.generator} />
 
 		<title>{title}</title>
@@ -47,6 +55,17 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 		--acid: #cbf000;
 		--ink: #000000;
 
+		/*
+		 * The measured average of the foil. It is the document's own background,
+		 * which means it is what shows in any strip the browser declines to let a
+		 * fixed element paint: the home indicator on an older iPhone, and on iOS 26
+		 * whatever the floating glass toolbar keeps for itself. The acid the page
+		 * actually shows is an overlay on top, so this colour is only ever seen at
+		 * that bottom edge, where it needs to pass for foil rather than announce
+		 * itself as a cut-off band of flat green.
+		 */
+		--foil-mean: #b7c2be;
+
 		--mono:
 			ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
 			'Liberation Mono', monospace;
@@ -58,6 +77,18 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 		 */
 		--icon-box: clamp(1.75rem, 4.4vw, 2.1rem);
 		--icon-glyph: clamp(15px, 1.9vw, 19px);
+
+		/*
+		 * The strips the hardware takes: the status bar and Dynamic Island at the
+		 * top, the home indicator at the bottom, the rounded corners either side in
+		 * landscape. Named here rather than used inline so a phone can be imitated
+		 * on a desktop by overriding these four, which is the only way to see this
+		 * go wrong without holding the phone.
+		 */
+		--safe-top: env(safe-area-inset-top, 0px);
+		--safe-right: env(safe-area-inset-right, 0px);
+		--safe-bottom: env(safe-area-inset-bottom, 0px);
+		--safe-left: env(safe-area-inset-left, 0px);
 	}
 
 	*,
@@ -66,19 +97,56 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 		box-sizing: border-box;
 	}
 
-	html,
-	body {
+	/*
+	 * A still likeness of the foil, in plain CSS, as the document's own
+	 * background.
+	 *
+	 * This is the one surface a browser will always paint. The root element's
+	 * background propagates to the canvas and covers the whole of it, including
+	 * the strips no element can reach: under the home indicator, and under iOS
+	 * 26's floating glass toolbar, which refuses to render fixed content beneath
+	 * itself and clips anything pushed past the edge. The shader cannot go there.
+	 * A background can.
+	 *
+	 * It does not move and it is not the real thing, but it tiles on the same
+	 * thirty-pixel cell and carries the same pastel sweep, so where it shows it
+	 * passes for the band continuing rather than the band being cut off.
+	 */
+	html {
 		height: 100%;
+		background-color: var(--foil-mean);
+		background-image: repeating-conic-gradient(
+			from 0.05turn,
+			#d7c6d4 0turn,
+			#c8d8c9 0.2turn,
+			#d8d4c2 0.42turn,
+			#bfcfda 0.63turn,
+			#cfc6d8 0.82turn,
+			#d7c6d4 1turn
+		);
+		background-size: 30px 30px;
 	}
 
+	/*
+	 * A column, so the footer is the last thing in the document rather than a bar
+	 * pinned to the viewport. Nothing at the bottom of this page is position:
+	 * fixed any more. iOS 26 will not render fixed content underneath its
+	 * floating glass toolbar, and no amount of reaching further down changes
+	 * that: content pushed past the edge is clipped rather than drawn. Ordinary
+	 * flow content has no such problem, so the footer is ordinary flow content.
+	 */
 	body {
+		/* The foil canvas stretches to this box, so it has to be the frame. */
+		position: relative;
 		margin: 0;
-		background: var(--acid);
+		min-height: 100dvh;
+		display: flex;
+		flex-direction: column;
+		background: var(--foil-mean);
 		color: var(--ink);
 		font-family: var(--mono);
 		font-synthesis-weight: none;
 		-webkit-font-smoothing: antialiased;
-		overflow: hidden;
 		overscroll-behavior: none;
 	}
 

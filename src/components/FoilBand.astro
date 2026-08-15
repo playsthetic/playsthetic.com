@@ -17,9 +17,15 @@ interface Props {
 const { note } = Astro.props;
 ---
 
-<footer class="foot">
-	<canvas class="foil__gl" aria-hidden="true"></canvas>
+{/*
+  The foil is the page's own backdrop: one sheet behind everything, with the
+  solid colour laid over it and the band at the foot simply where that colour
+  stops. Absolute rather than fixed, so it belongs to the document and iOS has
+  no cause to withhold it at the bottom.
+*/}
+<canvas class="foil__gl" aria-hidden="true"></canvas>
 
+<footer class="foot">
 	<div class="foot__row">
 		<span class="foot__note" data-scramble="540">{note}</span>
 
@@ -71,21 +77,37 @@ const { note } = Astro.props;
 
 <style>
 	/*
-	 * The lip is how far the canvas runs past the top of the footer, and the
-	 * radius of the page's rounded bottom corners. The two are the same number:
-	 * the foil has to already be there, behind the notch, for the corner to open
-	 * onto anything. Everything in that overhang other than the two notches is
-	 * left transparent, so it covers nothing.
+	 * The whole page, not a strip at the foot of it.
+	 *
+	 * Absolute, not fixed. Fixed is the whole reason this fought iOS: its glass
+	 * toolbar will not render fixed content beneath itself, and pushing further
+	 * down only gets it clipped. As part of the document it simply paints.
+	 *
+	 * Both dimensions are stated outright. Inset alone will not do it: a canvas
+	 * is a replaced element, so with an auto height it takes its own buffer's
+	 * aspect ratio and quietly ignores the bottom edge, which leaves it covering
+	 * half the page and the flat fallback colour showing under the rest.
+	 */
+	.foil__gl {
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 0;
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	/*
+	 * The last block in the document, not a bar pinned to the viewport. The body
+	 * is a column and the page above takes the slack, so this still sits at the
+	 * bottom of the screen without anything being fixed there.
 	 */
 	.foot {
-		--lip: 28px;
-
-		position: fixed;
-		right: 0;
-		bottom: 0;
-		left: 0;
-		z-index: 2;
-		height: clamp(3rem, 7.5svh, 5rem);
+		position: relative;
+		flex: none;
+		height: calc(clamp(3rem, 7.5dvh, 5rem) + var(--safe-bottom));
+		padding-bottom: var(--safe-bottom);
 		display: flex;
 		align-items: center;
 		font-size: clamp(0.6rem, 1.5vw, 0.7rem);
@@ -94,28 +116,17 @@ const { note } = Astro.props;
 		text-transform: uppercase;
 	}
 
-	/*
-	 * Height is set outright rather than left to a top/bottom pair. A canvas is
-	 * a replaced element, so with an auto height it sizes itself from its own
-	 * intrinsic ratio and quietly ignores the bottom edge.
-	 */
-	.foil__gl {
-		position: absolute;
-		top: calc(-1 * var(--lip));
-		left: 0;
-		display: block;
-		width: 100%;
-		height: calc(100% + var(--lip));
-	}
-
 	.foot__row {
 		position: relative;
+		pointer-events: auto;
 		display: flex;
 		width: 100%;
 		align-items: center;
 		justify-content: space-between;
 		gap: 1.5em;
-		padding-inline: clamp(0.9rem, 2.4vw, 1.6rem);
+		/* Clear of the rounded corners when the phone is on its side. */
+		padding-left: calc(clamp(0.9rem, 2.4vw, 1.6rem) + var(--safe-left));
+		padding-right: calc(clamp(0.9rem, 2.4vw, 1.6rem) + var(--safe-right));
 	}
 
 	/*
@@ -158,6 +169,17 @@ const { note } = Astro.props;
 		display: block;
 		width: var(--icon-glyph);
 		height: auto;
+	}
+
+	/*
+	 * No camera on a touch device: the handset reports its own tilt, which is
+	 * both truer and free. The button is only there for pointer machines, which
+	 * have no idea how they are being held.
+	 */
+	@media (hover: none) and (pointer: coarse) {
+		.foot__tilt {
+			display: none;
+		}
 	}
 
 	/* The glyph reports the state: struck through while the camera is off. */
@@ -211,22 +233,40 @@ const { note } = Astro.props;
 		uniform vec2 u_res;    // canvas size in CSS pixels
 		uniform vec2 u_tilt;   // view angle, roughly -1..1 on each axis
 		uniform vec3 u_acid;
-		uniform float u_lip;   // overhang above the footer, and the corner radius
+		// Turns of the spectrum per turn around a cell's centre. Whole numbers
+		// only: anything else tears the hue along the seam at half a turn.
+		const float TURNS = 3.0;
+
+		// Scales CELL_DRIFT below. Zero makes every cell of a parity identical.
+		const float DRIFT = 0.5;
+
+		// How far the spectrum is allowed from white. At zero the foil is bare
+		// silver working only in light and shade; at one it is a full rainbow.
+		// Prism foil sits nearer the silver end: a mirror with a rainbow in it.
+		const float SATURATION = 0.5;
+
+		/*
+		 * How much of a revolution carries colour at all.
+		 *
+		 * On a disc the spectrum does not run evenly all the way round: it crowds
+		 * into an arc facing the light, and the rest of the turn is plain silver.
+		 * This is the exponent on that falloff, so a low number spreads colour
+		 * around the whole cell and a high one squeezes it into a narrow wedge with
+		 * grey either side. It is a different thing from saturation, which sets how
+		 * strong the colour is once it is there rather than how far it reaches.
+		 */
+		const float ARC = 1.5;
 
 		const float TAU = 6.28318530718;
 
-		// A cell across, in CSS pixels rather than in band heights, so the grain
-		// stays put instead of stretching with the viewport.
-		const float CELL = 26.0;
+		// A cell across, in CSS pixels rather than a fraction of the canvas, so the
+		// grain keeps its size instead of stretching with the viewport.
+		const float CELL = 30.0;
 
-		// Turns of the spectrum per turn around a cell's centre. It has to be a
-		// whole number or the hue tears along the seam at half a turn.
-		const float SPECTRUM_TURNS = 1.0;
 
 		// How tight the sheen runs, and how far the colour is allowed from white.
 		// Prism foil is a mirror with a rainbow in it, not a rainbow.
 		const float SHARPNESS = 3.5;
-		const float SATURATION = 0.34;
 
 		// The eye, in CSS pixels: how far in front of the page it sits, and how
 		// far it travels from one side of the window to the other. Their ratio is
@@ -252,6 +292,31 @@ const { note } = Astro.props;
 		// alias into moire long before they read as grooves.
 		const float RULING_SPOKES = 14.0;
 
+		/*
+		 * How far a cell's phase drifts per step across the sheet, in turns of the
+		 * spectrum, before DRIFT scales it. Real foil is not struck perfectly:
+		 * the far corner of a sheet meets the eye at a slightly different angle
+		 * from the near one, and the stamping itself wanders. Without this every
+		 * cell of a parity is a carbon copy of every other, which is the one thing
+		 * that reads as printed rather than as foil.
+		 *
+		 * The two are detuned, so rows and columns do not come back into step with
+		 * each other.
+		 */
+		const vec2 CELL_DRIFT = vec2(0.013, 0.019);
+
+		// Turns of the spectrum walked per turn of the offset. At zero the pattern
+		// only rotates; at one the colours make a full circuit over a full turn of
+		// the view, which is roughly what the reference discs do.
+		// How far the offset walks the whole slice through the spectrum.
+		const float HUE_TURNS = 2.5;
+
+		// How wide a slice of the spectrum one cell covers, in turns of the wheel.
+		const float SPAN = 0.4;
+
+		// Where that slice sits when the offset is nowhere.
+		const float HUE_CENTRE = 0.55;
+
 		// How steeply each cell is embossed, as in-plane slope from its middle to
 		// its edge. Parallax alone cannot put a spectrum inside a cell this small:
 		// across nineteen pixels at arm's length the angle barely moves. On a real
@@ -263,29 +328,11 @@ const { note } = Astro.props;
 			return 0.5 + 0.5 * cos(TAU * (t + vec3(0.0, 0.33, 0.67)));
 		}
 
-		/*
-		 * How much of this pixel the solid page covers. The canvas overhangs the
-		 * footer by u_lip so that the page's rounded bottom corners have foil to
-		 * open onto; everywhere else in that overhang the page is on top and the
-		 * canvas keeps out of the way by staying transparent.
-		 */
-		float pageCover(vec2 fromTop) {
-			if (u_lip < 0.5 || fromTop.y > u_lip) return 0.0;
-
-			// Distance in from whichever side is nearer, so one arc serves both.
-			float inset = min(fromTop.x, u_res.x - fromTop.x);
-			if (inset >= u_lip) return 1.0;
-
-			// The corner arc is centred level with the top of the overhang.
-			float d = length(vec2(inset, fromTop.y) - vec2(u_lip, 0.0));
-			return 1.0 - smoothstep(u_lip - 1.0, u_lip + 1.0, d);
-		}
-
 		void main() {
 			/*
 			 * One viewing direction for the whole band, whether it comes from the
 			 * pointer or from the camera, so every tile answers the same way and
-			 * the strip reads as a single sheet of foil rather than as a row of
+			 * the sheet reads as one piece of foil rather than as a grid of
 			 * tiles each caught at its own angle.
 			 *
 			 * The variation inside a tile does not come from here. It comes from
@@ -327,27 +374,95 @@ const { note } = Astro.props;
 			sweep = mix(toLight.xy, sweep, smoothstep(0.0, 0.35, length(sweep)));
 			float azimuth = atan(sweep.y, sweep.x) + u_tilt.x * TILT_TURN;
 
-			// Spun one way here and the other way next door, and half a turn of the
-			// spectrum apart, so neighbours land on opposite colours. With every
-			// cell tooled alike that handedness is what keeps the checkerboard.
+			/*
+			 * Everything below is measured in a frame the view turns, so the cell
+			 * is one fixed picture that rotates rather than a picture whose colours
+			 * move through it.
+			 *
+			 * Three things used to break that. The mirrored half of the
+			 * checkerboard was written as spin * theta - azimuth, which turns it
+			 * the opposite way from its neighbour: the two parities counter-rotated
+			 * and read as churn rather than as a turn. The sheen was taken against
+			 * the eye, so brightness swam about independently. And the grain was
+			 * pinned to the page while the rest of the cell turned under it.
+			 */
+			/*
+			 * One offset, counted in turns, gathering every source: the viewing
+			 * angle, wherever it came from, and where this cell sits on the sheet.
+			 *
+			 * It drives the rotation and the hue together, because on a real disc
+			 * those are not separate. Turning it does not merely spin the pattern
+			 * about like a wheel, it walks the colours through it at the same time.
+			 * Driving only the rotation makes the cell read as a printed picture on
+			 * a turntable; driving only the hue leaves it flashing on the spot.
+			 */
+			/*
+			 * The drift is counted from the middle of the sheet outwards, not from
+			 * the corner.
+			 *
+			 * Cell indices all start positive at the top left, so measuring from
+			 * there means turning the dial up does not only open out the difference
+			 * between neighbours, it drags the average along with it and the whole
+			 * band shifts. Measured from the centre, the middle of the sheet holds
+			 * still whatever the dial says and the control does only the one thing:
+			 * how much the offset changes as you move across in x and y.
+			 */
+			vec2 middle = floor(0.5 * u_res / CELL);
+			float offset = azimuth / TAU + dot(id - middle, CELL_DRIFT) * DRIFT;
+
+			float local = theta - offset * TAU;
+
+			/*
+			 * Spun one way here and the other way next door, mirrored inside the
+			 * turning frame so both parities still turn together.
+			 *
+			 * The handedness is the whole of the difference now. Neighbours used to
+			 * be put half a turn of the spectrum apart as well, which is what made
+			 * every other square jump to an opposing colour: a checkerboard you read
+			 * as two alternating materials rather than as one sheet struck two ways.
+			 * The mirroring alone still tells the cells apart, and the drift across
+			 * the sheet still keeps any two from being identical, without the jump.
+			 */
 			float spin = checker < 0.5 ? 1.0 : -1.0;
-			float phase = (theta * spin - azimuth) / TAU * SPECTRUM_TURNS + checker * 0.5;
-			vec3 hue = mix(vec3(1.0), spectrum(phase), SATURATION);
+			float sweepPhase = spin * local / TAU * TURNS;
+
+			/*
+			 * A cell shows a slice of the spectrum, not the whole wheel.
+			 *
+			 * Running the full wheel round a cell puts complementary colours on
+			 * opposite sides of it, which is why this read blue on one side and red
+			 * on the other with grey between. The reference does not do that: its
+			 * two sides are neighbours in hue. So the sweep oscillates inside a band
+			 * rather than cycling through one, and the offset carries the whole band
+			 * along the spectrum, which is the colour shift that comes with the
+			 * turn.
+			 */
+			float phase = HUE_CENTRE + offset * HUE_TURNS + SPAN * cos(TAU * sweepPhase);
 
 			// Spun metal is bright where the grooves lie across the light and dark
-			// where they run along it: two lobes, opposite one another, turning
-			// with the view.
-			float thrown = abs(cos(theta - azimuth));
+			// where they run along it: two lobes, opposite one another.
+			float thrown = abs(cos(local));
 
-			// The cell is struck as a shallow dome, bowed the opposite way next
-			// door, so the sheen breaks at the seam instead of running through it.
-			vec3 normal = normalize(vec3(-fromCentre * EMBOSS * spin, 1.0));
+			// Colour only where the cell is throwing it, so the rest stays silver.
+			float lit = pow(thrown, ARC);
+			vec3 hue = mix(vec3(1.0), spectrum(phase), SATURATION * lit);
+
+			// The dome, struck the opposite way next door so the sheen breaks at
+			// the seam. Turned with the frame and lit head-on, so the highlight
+			// rides round with the pattern instead of sliding across it.
+			float ca = cos(-azimuth);
+			float sa = sin(-azimuth);
+			vec2 turned = vec2(
+				ca * fromCentre.x - sa * fromCentre.y,
+				sa * fromCentre.x + ca * fromCentre.y
+			);
+			vec3 normal = normalize(vec3(-turned * EMBOSS * spin, 1.0));
 			vec3 mirror = reflect(-toLight, normal);
-			float sheen = pow(max(dot(mirror, toEye), 0.0), SHARPNESS);
+			float sheen = pow(max(mirror.z, 0.0), SHARPNESS);
 
 			// The grooves themselves, as grain. Faded out near the middle, where
 			// spokes this fine would only alias.
-			float ruling = sin(theta * RULING_SPOKES);
+			float ruling = sin(local * RULING_SPOKES);
 			float glint = smoothstep(0.55, 1.0, ruling)
 				* smoothstep(0.0, 0.22, length(fromCentre)) * 0.03;
 
@@ -362,9 +477,7 @@ const { note } = Astro.props;
 			foil = mix(foil, foil * tint * 1.55, 0.1);
 			foil += glint * (0.45 + 0.55 * hue);
 
-			// Premultiplied, so the page shows through wherever the sheet covers.
-			float alpha = 1.0 - pageCover(v_uv * u_res);
-			gl_FragColor = vec4(clamp(foil, 0.0, 1.0) * alpha, alpha);
+			gl_FragColor = vec4(clamp(foil, 0.0, 1.0), 1.0);
 		}
 	`;
 
@@ -479,14 +592,11 @@ const { note } = Astro.props;
 	/* Strip ------------------------------------------------------------ */
 
 	function renderStrip() {
-		const strip = document.querySelector<HTMLElement>('.foot');
-		const canvas = strip?.querySelector<HTMLCanvasElement>('.foil__gl');
-		if (!strip || !canvas) return;
+		const canvas = document.querySelector<HTMLCanvasElement>('.foil__gl');
+		if (!canvas) return;
 
-		// Alpha on: the overhang above the footer has to let the page through
-		// everywhere except the two corner notches.
 		const gl = canvas.getContext('webgl', {
-			alpha: true,
+			alpha: false,
 			antialias: false,
 			depth: false,
 			stencil: false,
@@ -517,13 +627,14 @@ const { note } = Astro.props;
 			res: gl.getUniformLocation(program, 'u_res'),
 			tilt: gl.getUniformLocation(program, 'u_tilt'),
 			acid: gl.getUniformLocation(program, 'u_acid'),
-			lip: gl.getUniformLocation(program, 'u_lip'),
 		};
 
 		const resize = () => {
-			// The canvas, not the footer: it stands taller by the overhang.
 			const rect = canvas.getBoundingClientRect();
-			const dpr = Math.min(window.devicePixelRatio || 1, 2);
+			// Capped lower than the usual 2: this now covers the whole page, and
+			// the finish is soft enough that the extra samples buy nothing worth
+			// four times the fill rate on a phone.
+			const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 			const w = Math.max(1, Math.round(rect.width * dpr));
 			const h = Math.max(1, Math.round(rect.height * dpr));
 			if (canvas.width === w && canvas.height === h) return;
@@ -534,21 +645,25 @@ const { note } = Astro.props;
 			// CSS pixels, not device pixels: the cell size is a design measure and
 			// should not halve on a retina screen.
 			gl.uniform2f(u.res, rect.width, rect.height);
-			// Read back from CSS so the overhang and the radius cannot drift apart.
-			gl.uniform1f(u.lip, parseFloat(getComputedStyle(strip).getPropertyValue('--lip')) || 0);
 		};
 
 		resize();
-		new ResizeObserver(resize).observe(strip);
+		new ResizeObserver(resize).observe(document.documentElement);
 
 		/*
-		 * Two ways in, and only two: the camera when it is on, otherwise a slow
-		 * ping-pong. The pointer is deliberately not one of them. The foil is a
-		 * surface being looked at, not a control, and tying it to the cursor made
-		 * it read as a thing you operate.
+		 * Three ways in, in order of preference: the phone's own tilt, the camera,
+		 * and failing both a slow ping-pong. The pointer is deliberately not one of
+		 * them. The foil is a surface being looked at, not a control, and tying it
+		 * to the cursor made it read as a thing you operate.
+		 *
+		 * On a phone the accelerometer is the real article: the sheet answers to
+		 * how the handset is actually held, which is what foil does. Nothing else
+		 * runs there. The loop would only fight the hand, and the camera is a great
+		 * deal to ask for something the hardware already knows.
 		 */
 		const WANDER_PERIOD = 24; // seconds for a full there and back
-		const WANDER = 0.85;
+		const WANDER = 0.5;
+
 
 		/*
 		 * A triangle, not a sine. A sine spends most of its time near its ends,
@@ -562,6 +677,79 @@ const { note } = Astro.props;
 		};
 
 		const head = { x: 0, y: 0, live: false };
+		const held = { x: 0, y: 0, live: false };
+
+		/*
+		 * A handset answers to how it is held, and to nothing else. The loop is for
+		 * machines that cannot know: it would only fight the hand here, and a sheet
+		 * of foil that moves while you hold it still is not a sheet of foil.
+		 *
+		 * The cost is that iOS reports no motion until someone has touched the
+		 * page, so until that first touch the foil simply sits where it is. That is
+		 * the honest behaviour: still, because nothing has moved it yet.
+		 */
+		const handheld = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+		/*
+		 * How far the handset has to lean for a full swing. Forty-odd degrees, so
+		 * the whole range is reachable from a normal grip without waving it about.
+		 * Beta is measured from a screen lying flat, and REST is roughly where a
+		 * phone sits when someone is reading it, so that reads as no tilt at all.
+		 */
+		const LEAN = 40;
+		const REST = 50;
+
+		/*
+		 * How long to wait for the handset to say something before deciding it
+		 * never will. Long enough for a granted sensor to report, short enough that
+		 * a page which is never going to move does not sit there looking broken.
+		 */
+		const MOTION_GRACE = 3;
+
+		function listenToTilt() {
+			window.addEventListener(
+				'deviceorientation',
+				(e) => {
+					// Arriving is not the same as carrying anything. With Motion and
+					// Orientation Access switched off in Settings, iOS grants the
+					// permission and then sends events with nothing in them, so the
+					// values are the test, not the grant.
+					if (e.gamma === null || e.beta === null) return;
+					held.live = true;
+					held.x = Math.max(-1, Math.min(1, e.gamma / LEAN));
+					// Held well under the horizontal: a large vertical swing cancels
+					// the light and steers the anchor into its blind spot.
+					held.y = Math.max(-1, Math.min(1, (e.beta - REST) / LEAN)) * 0.4;
+				},
+				{ passive: true }
+			);
+		}
+
+		/*
+		 * iOS will not report motion until someone has asked for it from inside a
+		 * gesture, so the first touch anywhere on the page does the asking. That is
+		 * a far smaller thing to put in front of a visitor than the camera, and it
+		 * needs no control of its own. Everywhere else it simply starts.
+		 */
+		const Motion = window.DeviceOrientationEvent as unknown as {
+			requestPermission?: () => Promise<PermissionState>;
+		};
+
+		if (Motion) {
+			if (typeof Motion.requestPermission === 'function') {
+				const ask = async () => {
+					try {
+						if ((await Motion.requestPermission!()) === 'granted') listenToTilt();
+					} catch {
+						// Declined, or an insecure origin, which iOS treats the same
+						// way. Either leaves the loop to carry it.
+					}
+				};
+				window.addEventListener('touchend', ask, { once: true, passive: true });
+			} else {
+				listenToTilt();
+			}
+		}
 
 		/*
 		 * How quickly the foil catches up, per second. The camera needs it: it is
@@ -570,12 +758,30 @@ const { note } = Astro.props;
 		 * easing carries the handover when the camera goes on or off.
 		 */
 		const HEAD_FOLLOW = 9;
-		const LOOP_FOLLOW = 13;
+
+		/*
+		 * Deliberately slow, and doing a second job. A triangle holds one speed the
+		 * whole way across, which is what stops the loop dwelling at its ends the
+		 * way a sine does, but it reverses in an instant. Following it this loosely
+		 * rounds that corner over about a second and leaves the straight middle
+		 * alone: the turn eases, the pass does not slow down.
+		 */
+		const LOOP_FOLLOW = 2;
+
+		/*
+		 * Deliberately slow, and it is doing a second job. A triangle holds one
+		 * speed the whole way across, which is what stops the loop dwelling at its
+		 * ends the way a sine does, but it reverses in an instant. Following it
+		 * this loosely rounds that corner over about a second while leaving the
+		 * straight middle alone: the turn eases, the pass does not slow down.
+		 */
+
 		const tilt = { x: 0, y: 0 };
 
 		const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		const started = performance.now();
 		let last = started;
+		let drawn = false;
 
 		const frame = (now: number) => {
 			const dt = Math.min((now - last) / 1000, 0.05);
@@ -588,17 +794,43 @@ const { note } = Astro.props;
 			 * light and steers the anchor into the blind spot where it has no
 			 * direction left to point.
 			 */
-			const want = head.live
-				? { x: head.x, y: head.y }
-				: {
-						// Detuned, so the two axes do not turn back together.
-						x: pingPong(t, WANDER_PERIOD, 0.25) * WANDER,
-						y: pingPong(t, WANDER_PERIOD * 1.64, 0.6) * WANDER * 0.3,
-					};
+			/*
+			 * The loop is the fallback, not the default. A handset gets a moment to
+			 * report for itself first, and if nothing comes, the loop starts: no
+			 * sensor, permission declined, or the switch in Settings turned off, all
+			 * of which look the same from here and all of which want the same
+			 * answer. Should the handset speak up later, it takes over for good.
+			 */
+			const noMotion = !handheld || t > MOTION_GRACE;
 
-			const follow = 1 - Math.exp(-dt * (head.live ? HEAD_FOLLOW : LOOP_FOLLOW));
+			let want = { x: 0, y: 0 };
+			if (held.live) want = { x: held.x, y: held.y };
+			else if (head.live) want = { x: head.x, y: head.y };
+			else if (noMotion) {
+				// Detuned, so the two axes do not turn back together.
+				want = {
+					x: pingPong(t, WANDER_PERIOD, 0.25) * WANDER,
+					y: pingPong(t, WANDER_PERIOD * 1.64, 0.6) * WANDER * 0.3,
+				};
+			}
+
+			const follow = 1 - Math.exp(-dt * (held.live || head.live ? HEAD_FOLLOW : LOOP_FOLLOW));
 			tilt.x += (want.x - tilt.x) * follow;
 			tilt.y += (want.y - tilt.y) * follow;
+
+			/*
+			 * Nothing is driving it and it has arrived, so there is nothing new to
+			 * draw. Worth the check on a phone waiting for its first touch: without
+			 * it that is a full-page shader redrawing an identical picture sixty
+			 * times a second on battery.
+			 */
+			const settled =
+				Math.abs(want.x - tilt.x) < 0.0004 && Math.abs(want.y - tilt.y) < 0.0004;
+			if (settled && drawn) {
+				requestAnimationFrame(frame);
+				return;
+			}
+			drawn = true;
 
 			gl.uniform2f(u.tilt, tilt.x, tilt.y);
 			// The band sits flush against the page, so it tracks the drifting
