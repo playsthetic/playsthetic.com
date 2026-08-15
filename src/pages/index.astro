@@ -355,10 +355,11 @@ const socials = [
 		if (!chars.length) return;
 
 		// Longer strings resolve faster per character so every run still lands
-		// at roughly the same moment.
-		const step = Math.min(45, 620 / chars.length);
-		const settleAt = chars.map((_, i) => delay + i * step + Math.random() * 200);
-		const done = Math.max(...settleAt) + 60;
+		// at roughly the same moment. The budget is what sets how long the whole
+		// thing takes; the cap keeps a short run from crawling through it.
+		const step = Math.min(72, 1080 / chars.length);
+		const settleAt = chars.map((_, i) => delay + i * step + Math.random() * 320);
+		const done = Math.max(...settleAt) + 90;
 
 		const placeholder = chars.map(() => '0');
 		let roll = -1;
