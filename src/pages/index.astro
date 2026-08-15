@@ -203,10 +203,74 @@ const socials = [
 	 */
 	.mark {
 		--mark-width: clamp(220px, min(80vw, 68svh), 620px);
+
+		/*
+		 * The pool of colour the artwork sits in. Stated here, in one place, and
+		 * read back out by the shader: the mark's canvas is opaque and paints the
+		 * page colour itself, so the glow has to be drawn twice, once in CSS for
+		 * the page around the canvas and once in the fragment shader for the part
+		 * the canvas covers. Radius is in mark-widths so both agree without
+		 * either having to measure the other.
+		 */
+		--glow: 255 255 255;
+		--glow-alpha: 0.5;
+		--glow-radius: 1;
+
 		position: relative;
 		width: var(--mark-width);
 		aspect-ratio: 1001 / 729;
 		margin-block: calc(var(--mark-width) * -0.0607);
+	}
+
+	/*
+	 * Behind the artwork, and behind the canvas: the ink is drawn by subtracting
+	 * from whatever is underneath it, so the glow reaches the letters as
+	 * something they are cut out of rather than a wash laid over them, and they
+	 * stay flat black in the middle of it.
+	 *
+	 * A plain two-stop ramp falls off linearly and gives a cone with a visible
+	 * point at the centre and a hard edge where it lands, so the stops below are
+	 * smoothstep biased toward the core instead, sampled every twentieth of the
+	 * radius. That is finer than it looks like it needs to be. The shader runs
+	 * the curve itself and the two are edge to edge along the canvas boundary,
+	 * so the error between a chord and the arc it cuts is a visible line rather
+	 * than a rounding detail.
+	 *
+	 * If the canvas ever shows as a rectangle while you are changing these by
+	 * hand, check that the page is actually on screen before believing it. The
+	 * shader only redraws under requestAnimationFrame, so a hidden or background
+	 * tab leaves the canvas on an old frame while the CSS half repaints against
+	 * the current values, and the two halves disagree for reasons that have
+	 * nothing to do with either of them.
+	 */
+	.mark::before {
+		content: '';
+		position: absolute;
+		z-index: -1;
+		inset: calc(var(--glow-radius) * var(--mark-width) * -1);
+		background: radial-gradient(
+			circle calc(var(--glow-radius) * var(--mark-width)) at 50% 50%,
+			rgb(var(--glow) / var(--glow-alpha)) 0%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.988)) 5%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.956)) 10%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.905)) 15%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.839)) 20%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.762)) 25%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.678)) 30%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.589)) 35%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.499)) 40%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.412)) 45%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.330)) 50%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.255)) 55%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.188)) 60%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.132)) 65%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.086)) 70%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.051)) 75%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.027)) 80%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.011)) 85%,
+			rgb(var(--glow) / calc(var(--glow-alpha) * 0.003)) 90%,
+			rgb(var(--glow) / 0) 100%
+		);
 	}
 
 	.mark__img,
@@ -413,6 +477,12 @@ const socials = [
 		uniform float u_wake;
 		uniform float u_hover;
 
+		// The glow the artwork sits in, read from the CSS the page draws it with.
+		// Radius is in canvas widths, which is what keeps the two in step.
+		uniform vec3 u_glow;
+		uniform float u_glowAlpha;
+		uniform float u_glowRadius;
+
 		float hash(vec2 p) {
 			return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 		}
@@ -494,7 +564,19 @@ const socials = [
 				ink(p - vec2(split, 0.0))
 			);
 
-			gl_FragColor = vec4(u_bg * (1.0 - coverage), 1.0);
+			// The glow sits on the page, not on the artwork, so it reads from the
+			// undistorted uv: the melt moves the ink through it rather than
+			// dragging it along. Circular, so the vertical axis is measured in
+			// canvas widths too.
+			vec2 fromCentre = (uv - 0.5) * vec2(1.0, 1.0 / aspect);
+			float t = clamp(length(fromCentre) / u_glowRadius, 0.0, 1.0);
+			// Biased toward the core, so the light stays gathered behind the
+			// artwork rather than smeared evenly across the page. The stylesheet
+			// samples this same curve.
+			float fall = pow(1.0 - t * t * (3.0 - 2.0 * t), 1.6);
+			vec3 base = mix(u_bg, u_glow, fall * u_glowAlpha);
+
+			gl_FragColor = vec4(base * (1.0 - coverage), 1.0);
 		}
 	`;
 
@@ -553,7 +635,27 @@ const socials = [
 			bg: gl.getUniformLocation(program, 'u_bg'),
 			wake: gl.getUniformLocation(program, 'u_wake'),
 			hover: gl.getUniformLocation(program, 'u_hover'),
+			glow: gl.getUniformLocation(program, 'u_glow'),
+			glowAlpha: gl.getUniformLocation(program, 'u_glowAlpha'),
+			glowRadius: gl.getUniformLocation(program, 'u_glowRadius'),
 		};
+
+		/*
+		 * The glow is the stylesheet's to describe, not this script's. Reading it
+		 * back off the element keeps one definition of the colour and the falloff,
+		 * rather than a pair that drift apart the first time one is nudged. Read
+		 * once: none of it responds to anything, and the radius is a ratio, so a
+		 * resize does not change it either.
+		 */
+		const styles = getComputedStyle(mark);
+		const glow = styles
+			.getPropertyValue('--glow')
+			.trim()
+			.split(/[\s,]+/)
+			.map((v) => Number(v) / 255);
+		gl.uniform3fv(u.glow, glow.length === 3 ? glow : [0, 0, 0]);
+		gl.uniform1f(u.glowAlpha, parseFloat(styles.getPropertyValue('--glow-alpha')) || 0);
+		gl.uniform1f(u.glowRadius, parseFloat(styles.getPropertyValue('--glow-radius')) || 1);
 
 		const texture = gl.createTexture();
 		gl.bindTexture(gl.TEXTURE_2D, texture);
