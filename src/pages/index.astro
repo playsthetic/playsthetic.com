@@ -181,6 +181,17 @@ const socials = [
 		position: relative;
 		z-index: 1;
 		flex: 1;
+		/*
+		 * The glow behind the mark is a circle wider than the artwork, so it hangs
+		 * well past this box on every side: several hundred pixels below the foot
+		 * of the page on a desktop, which an absolute box contributes to the
+		 * scrollable area whether or not anything can be seen down there. Clipped
+		 * rather than hidden, so this does not quietly become a scroll container
+		 * of its own. It costs nothing to look at: every edge it cuts is already
+		 * an edge, the page's own on three sides and the top of the foil band on
+		 * the fourth.
+		 */
+		overflow: clip;
 		border-bottom-left-radius: 28px;
 		border-bottom-right-radius: 28px;
 		display: flex;
@@ -326,7 +337,7 @@ const socials = [
 	/* Texture ---------------------------------------------------------- */
 
 	.grain {
-		position: fixed;
+		position: absolute;
 		inset: 0;
 		z-index: 5;
 		pointer-events: none;

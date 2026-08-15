@@ -70,25 +70,17 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 	 * The page colour, drifting with the rest of it, rather than something the
 	 * page has to be painted over. Whatever a browser leaves uncovered at an
 	 * edge is then already the right colour.
-	 *
-	 * Nothing scrolls, so the overflow costs nothing, and the foil is allowed to
-	 * be taller than the page it sits behind without turning that into a scroll
-	 * bar.
 	 */
 	html {
 		height: 100%;
-		overflow: hidden;
 		background: var(--acid);
 	}
 
 	/*
 	 * One screen: the page takes the height of the viewport, the stage takes
 	 * whatever the footer leaves, and the footer sits at the bottom because it
-	 * is the last thing in the column.
-	 *
-	 * The small viewport, so the footer clears a phone's address bar rather than
-	 * sitting behind it. The foil underneath answers to the large one instead,
-	 * which is what closes the gap when that bar retracts.
+	 * is the last thing in the column. The small viewport, so the footer clears
+	 * a phone's address bar rather than sitting behind it.
 	 */
 	body {
 		/* The foil canvas stretches to this box, so it has to be the frame. */

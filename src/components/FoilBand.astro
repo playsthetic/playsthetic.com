@@ -76,14 +76,10 @@ const { note } = Astro.props;
 
 <style>
 	/*
-	 * The whole page, not a strip at the foot of it.
-	 *
-	 * The large viewport rather than the page's own height, which is the small
-	 * one. The difference is the strip a phone's address bar sits over, and it
-	 * appears the moment that bar retracts. The page has no business growing
-	 * into it, or the footer would move about as the bar came and went, but the
-	 * foil behind the footer very much does: it is what the visitor sees at the
-	 * bottom of the screen, so it has to reach the bottom of the screen.
+	 * The whole page, not a strip at the foot of it. The page's own height, and
+	 * no further: reaching past the bottom to fill the strip a phone's address
+	 * bar sits over means the sheet is a different size from the page it backs,
+	 * and everything that follows from that is worse than the gap it closes.
 	 *
 	 * Both dimensions are stated outright. Inset alone will not do it: a canvas
 	 * is a replaced element, so with an auto height it takes its own buffer's
@@ -97,7 +93,7 @@ const { note } = Astro.props;
 		z-index: 0;
 		display: block;
 		width: 100%;
-		height: 100lvh;
+		height: 100%;
 	}
 
 	/*
