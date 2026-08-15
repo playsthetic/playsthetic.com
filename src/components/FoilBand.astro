@@ -20,8 +20,7 @@ const { note } = Astro.props;
 {/*
   The foil is the page's own backdrop: one sheet behind everything, with the
   solid colour laid over it and the band at the foot simply where that colour
-  stops. Absolute rather than fixed, so it belongs to the document and iOS has
-  no cause to withhold it at the bottom.
+  stops.
 */}
 <canvas class="foil__gl" aria-hidden="true"></canvas>
 
@@ -79,9 +78,12 @@ const { note } = Astro.props;
 	/*
 	 * The whole page, not a strip at the foot of it.
 	 *
-	 * Absolute, not fixed. Fixed is the whole reason this fought iOS: its glass
-	 * toolbar will not render fixed content beneath itself, and pushing further
-	 * down only gets it clipped. As part of the document it simply paints.
+	 * The large viewport rather than the page's own height, which is the small
+	 * one. The difference is the strip a phone's address bar sits over, and it
+	 * appears the moment that bar retracts. The page has no business growing
+	 * into it, or the footer would move about as the bar came and went, but the
+	 * foil behind the footer very much does: it is what the visitor sees at the
+	 * bottom of the screen, so it has to reach the bottom of the screen.
 	 *
 	 * Both dimensions are stated outright. Inset alone will not do it: a canvas
 	 * is a replaced element, so with an auto height it takes its own buffer's
@@ -95,21 +97,20 @@ const { note } = Astro.props;
 		z-index: 0;
 		display: block;
 		width: 100%;
-		height: 100%;
+		height: 100lvh;
 	}
 
 	/*
-	 * The last block in the document, not a bar pinned to the viewport. The body
-	 * is a column and the page above takes the slack, so this still sits at the
-	 * bottom of the screen without anything being fixed there.
+	 * The last block in the column, so it sits at the bottom of the screen
+	 * without being pinned there: the stage above takes the slack.
 	 */
 	.foot {
 		position: relative;
 		flex: none;
-		height: calc(clamp(3rem, 7.5dvh, 5rem) + var(--safe-bottom));
-		padding-bottom: var(--safe-bottom);
+		height: clamp(3rem, 7.5svh, 5rem);
 		display: flex;
 		align-items: center;
+		padding: 0 clamp(0.9rem, 2.4vw, 1.6rem);
 		font-size: clamp(0.6rem, 1.5vw, 0.7rem);
 		letter-spacing: 0.14em;
 		line-height: 1.5;
@@ -118,15 +119,11 @@ const { note } = Astro.props;
 
 	.foot__row {
 		position: relative;
-		pointer-events: auto;
 		display: flex;
 		width: 100%;
 		align-items: center;
 		justify-content: space-between;
 		gap: 1.5em;
-		/* Clear of the rounded corners when the phone is on its side. */
-		padding-left: calc(clamp(0.9rem, 2.4vw, 1.6rem) + var(--safe-left));
-		padding-right: calc(clamp(0.9rem, 2.4vw, 1.6rem) + var(--safe-right));
 	}
 
 	/*
